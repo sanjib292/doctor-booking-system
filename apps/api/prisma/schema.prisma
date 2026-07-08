@@ -1,0 +1,570 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+//  Enums
+// ─────────────────────────────────────────────
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  IN_CONSULTATION
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum NotificationChannel {
+  FCM
+  EMAIL
+  SMS
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  BOOKING_REMINDER_24H
+  BOOKING_REMINDER_1H
+  BOOKING_CANCELLED
+  BOOKING_RESCHEDULED
+  DOCTOR_UNAVAILABLE
+  NEW_APPOINTMENT
+  NEW_REVIEW
+  SCHEDULE_REMINDER
+  SYSTEM
+}
+
+enum SlotStatus {
+  AVAILABLE
+  LOCKED
+  BOOKED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// ─────────────────────────────────────────────
+//  Core User Model
+// ─────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(uuid())
+  phone             String    @unique
+  email             String?   @unique
+  name              String
+  gender            Gender?
+  age               Int?
+  avatarUrl         String?
+  fcmToken          String?
+  isActive          Boolean   @default(true)
+  isBlocked         Boolean   @default(false)
+  lastKnownLat      Float?
+  lastKnownLng      Float?
+  lastLocationAt    DateTime?
+  role              Role      @default(PATIENT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  appointments      Appointment[]       @relation("PatientAppointments")
+  favorites         Favorite[]
+  reviews           Review[]
+  notifications     Notification[]
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]          @relation("AuditUser")
+
+  @@index([phone])
+  @@index([role])
+  @@index([lastKnownLat, lastKnownLng])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+//  Admin Model
+// ─────────────────────────────────────────────
+
+model Admin {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(ADMIN)
+  avatarUrl    String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]     @relation("AuditAdmin")
+
+  @@index([email])
+  @@map("admins")
+}
+
+// ─────────────────────────────────────────────
+//  Category Model
+// ─────────────────────────────────────────────
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  iconUrl     String?
+  color       String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  doctorCategories DoctorCategory[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────────
+//  Doctor Model
+// ─────────────────────────────────────────────
+
+model Doctor {
+  id                  String             @id @default(uuid())
+  userId              String?            @unique
+  email               String             @unique
+  passwordHash        String
+  name                String
+  phone               String             @unique
+  gender              Gender?
+  avatarUrl           String?
+  about               String?
+  qualifications      String[]
+  experienceYears     Int                @default(0)
+  languages           String[]
+  verificationStatus  VerificationStatus @default(PENDING)
+  verifiedAt          DateTime?
+  isActive            Boolean            @default(true)
+  fcmToken            String?
+  averageRating       Float              @default(0)
+  totalReviews        Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  // Relations
+  categories       DoctorCategory[]
+  clinics          DoctorClinic[]
+  availabilities   DoctorAvailability[]
+  appointments     Appointment[]        @relation("DoctorAppointments")
+  reviews          Review[]
+  vacations        DoctorVacation[]
+  blockedDates     BlockedDate[]
+  refreshTokens    RefreshToken[]
+  notifications    DoctorNotification[]
+
+  @@index([email])
+  @@index([verificationStatus])
+  @@index([isActive])
+  @@index([averageRating])
+  @@map("doctors")
+}
+
+model DoctorCategory {
+  id         String   @id @default(uuid())
+  doctorId   String
+  categoryId String
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, categoryId])
+  @@index([doctorId])
+  @@index([categoryId])
+  @@map("doctor_categories")
+}
+
+// ─────────────────────────────────────────────
+//  Clinic Model
+// ─────────────────────────────────────────────
+
+model Clinic {
+  id                String    @id @default(uuid())
+  name              String
+  addressLine1      String
+  addressLine2      String?
+  city              String
+  state             String
+  country           String    @default("India")
+  postalCode        String?
+  lat               Float
+  lng               Float
+  phone             String?
+  email             String?
+  website           String?
+  images            String[]
+  parkingAvailable  Boolean   @default(false)
+  accessibilityNote String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  doctors      DoctorClinic[]
+  appointments Appointment[]
+
+  @@index([city])
+  @@index([lat, lng])
+  @@index([isActive])
+  @@map("clinics")
+}
+
+model DoctorClinic {
+  id               String    @id @default(uuid())
+  doctorId         String
+  clinicId         String
+  consultationFee  Float
+  isPrimary        Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  availabilities DoctorAvailability[]
+
+  @@unique([doctorId, clinicId])
+  @@index([doctorId])
+  @@index([clinicId])
+  @@map("doctor_clinics")
+}
+
+// ─────────────────────────────────────────────
+//  Availability & Slots
+// ─────────────────────────────────────────────
+
+model DoctorAvailability {
+  id                   String    @id @default(uuid())
+  doctorId             String
+  doctorClinicId       String?
+  dayOfWeek            DayOfWeek
+  startTime            String    // "09:00"
+  endTime              String    // "17:00"
+  slotDurationMinutes  Int       @default(15)
+  breakStart           String?   // "13:00"
+  breakEnd             String?   // "14:00"
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  doctor      Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorClinic DoctorClinic? @relation(fields: [doctorClinicId], references: [id])
+
+  @@unique([doctorId, doctorClinicId, dayOfWeek])
+  @@index([doctorId])
+  @@map("doctor_availabilities")
+}
+
+model TimeSlot {
+  id           String     @id @default(uuid())
+  doctorId     String
+  clinicId     String?
+  date         DateTime   @db.Date
+  startTime    String     // "09:00"
+  endTime      String     // "09:15"
+  status       SlotStatus @default(AVAILABLE)
+  lockedAt     DateTime?
+  lockedBy     String?    // userId who has temporary lock
+  lockExpiresAt DateTime?
+  bookedAt     DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  appointment  Appointment?
+
+  @@unique([doctorId, clinicId, date, startTime])
+  @@index([doctorId, date, status])
+  @@index([clinicId, date])
+  @@index([lockExpiresAt])
+  @@map("time_slots")
+}
+
+model DoctorVacation {
+  id        String   @id @default(uuid())
+  doctorId  String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, startDate])
+  @@map("doctor_vacations")
+}
+
+model BlockedDate {
+  id        String   @id @default(uuid())
+  doctorId  String
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, date])
+  @@index([doctorId])
+  @@map("blocked_dates")
+}
+
+// ─────────────────────────────────────────────
+//  Appointment Model
+// ─────────────────────────────────────────────
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String
+  doctorId        String
+  clinicId        String?
+  slotId          String            @unique
+  date            DateTime          @db.Date
+  startTime       String
+  endTime         String
+  status          AppointmentStatus @default(PENDING)
+  notes           String?
+  cancellationReason String?
+  cancelledBy     String?
+  isPatientReminded24h Boolean     @default(false)
+  isPatientReminded1h  Boolean     @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patient    User     @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor     Doctor   @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  clinic     Clinic?  @relation(fields: [clinicId], references: [id])
+  slot       TimeSlot @relation(fields: [slotId], references: [id])
+  statusHistory AppointmentStatusHistory[]
+  review     Review?
+
+  @@index([patientId, status])
+  @@index([doctorId, date, status])
+  @@index([date])
+  @@index([status])
+  @@map("appointments")
+}
+
+model AppointmentStatusHistory {
+  id            String            @id @default(uuid())
+  appointmentId String
+  fromStatus    AppointmentStatus?
+  toStatus      AppointmentStatus
+  changedBy     String?
+  reason        String?
+  createdAt     DateTime          @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId])
+  @@map("appointment_status_history")
+}
+
+// ─────────────────────────────────────────────
+//  Review Model
+// ─────────────────────────────────────────────
+
+model Review {
+  id            String    @id @default(uuid())
+  appointmentId String    @unique
+  patientId     String
+  doctorId      String
+  rating        Int       // 1-5
+  comment       String?
+  isVisible     Boolean   @default(true)
+  moderatedAt   DateTime?
+  moderatedBy   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  patient     User        @relation(fields: [patientId], references: [id])
+  doctor      Doctor      @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId, isVisible])
+  @@index([patientId])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+//  Favorites
+// ─────────────────────────────────────────────
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  doctorId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, doctorId])
+  @@index([userId])
+  @@map("favorites")
+}
+
+// ─────────────────────────────────────────────
+//  Notifications
+// ─────────────────────────────────────────────
+
+model Notification {
+  id         String             @id @default(uuid())
+  userId     String
+  type       NotificationType
+  title      String
+  body       String
+  data       Json?
+  isRead     Boolean            @default(false)
+  readAt     DateTime?
+  sentVia    NotificationChannel @default(FCM)
+  createdAt  DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model DoctorNotification {
+  id         String             @id @default(uuid())
+  doctorId   String
+  type       NotificationType
+  title      String
+  body       String
+  data       Json?
+  isRead     Boolean            @default(false)
+  readAt     DateTime?
+  createdAt  DateTime           @default(now())
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, isRead])
+  @@map("doctor_notifications")
+}
+
+// ─────────────────────────────────────────────
+//  Authentication
+// ─────────────────────────────────────────────
+
+model OtpCode {
+  id          String   @id @default(uuid())
+  phone       String
+  code        String
+  isUsed      Boolean  @default(false)
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([phone, isUsed])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  userId      String?
+  doctorId    String?
+  adminId     String?
+  expiresAt   DateTime
+  isRevoked   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doctor  Doctor? @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────
+//  Audit Logs
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  adminId    String?
+  action     String
+  entity     String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user  User?  @relation("AuditUser", fields: [userId], references: [id])
+  admin Admin? @relation("AuditAdmin", fields: [adminId], references: [id])
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────
+//  Application Settings
+// ─────────────────────────────────────────────
+
+model AppSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string")
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}

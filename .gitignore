@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.dart_tool/
+.pub-cache/
+.packages
+
+# Build outputs
+dist/
+build/
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Environment
+.env
+.env.local
+.env.production
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Prisma
+# (schema.prisma is committed, but migration lock is auto-generated)
+
+# Coverage
+coverage/
+
+# Docker
+docker/postgres-data/
+
+# Flutter generated
+*.g.dart
+*.freezed.dart
+
+# Test
+*.test.js.snap

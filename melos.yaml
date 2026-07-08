@@ -1,0 +1,47 @@
+name: doctor_booking_system
+
+packages:
+  - apps/patient_app
+  - apps/doctor_app
+  - apps/admin_panel
+  - packages/**
+
+sdkPath: auto
+
+command:
+  version:
+    message: "chore: release version {newVersion}"
+    branch: main
+
+scripts:
+  analyze:
+    run: melos exec -- flutter analyze
+    description: Run flutter analyze across all packages
+
+  test:
+    run: melos exec -- flutter test
+    description: Run flutter test across all packages
+
+  build:android:
+    run: flutter build apk --release
+    description: Build release APK
+    select-package:
+      dirExists: android
+
+  build:web:
+    run: flutter build web --release
+    description: Build release web
+    select-package:
+      dirExists: web
+
+  format:
+    run: melos exec -- dart format .
+    description: Format all Dart code
+
+  clean:
+    run: melos exec -- flutter clean
+    description: Clean all Flutter packages
+
+  get:
+    run: melos exec -- flutter pub get
+    description: Get dependencies for all packages

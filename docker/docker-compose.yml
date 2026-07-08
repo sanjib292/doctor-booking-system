@@ -1,0 +1,69 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: runner
+    container_name: doctor-booking-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/doctor_booking
+    env_file:
+      - ../apps/api/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - api-logs:/app/logs
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: doctor-booking-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: doctor_booking
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: doctor-booking-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - api
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+  api-logs:
+  nginx-logs:
+
+networks:
+  app-network:
+    driver: bridge

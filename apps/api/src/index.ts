@@ -46,6 +46,9 @@ io.on('connection', (socket) => {
   });
 });
 
+// Trust Railway / reverse-proxy X-Forwarded-For so rate-limit sees real IPs
+app.set("trust proxy", 1);
+
 // ─── Security ────────────────────────────────────────────────────────────────
 app.use(helmet());
 

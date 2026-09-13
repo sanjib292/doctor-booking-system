@@ -5,6 +5,9 @@ WORKDIR /app
 COPY apps/api/package.json apps/api/yarn.lock ./
 RUN yarn install --frozen-lockfile --ignore-scripts
 
+# Inject the pg-based Prisma shim (replaces binary Prisma client, no download needed)
+COPY apps/api/prisma-shim/default.js ./node_modules/.prisma/client/default.js
+
 # Copy API source
 COPY apps/api/ .
 

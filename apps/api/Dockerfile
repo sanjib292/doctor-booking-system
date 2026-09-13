@@ -1,12 +1,12 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Install dependencies
-COPY package.json yarn.lock ./
+# Install dependencies (build context is repo root, so prefix with apps/api/)
+COPY apps/api/package.json apps/api/yarn.lock ./
 RUN yarn install --frozen-lockfile --ignore-scripts
 
-# Copy full source
-COPY . .
+# Copy API source
+COPY apps/api/ .
 
 # Expose port (Railway injects $PORT)
 EXPOSE 3000

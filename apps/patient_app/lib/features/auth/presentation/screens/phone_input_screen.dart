@@ -148,8 +148,11 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: SizedBox(
-            height: size.height - MediaQuery.of(context).padding.top - 48,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: size.height - MediaQuery.of(context).padding.vertical - 48,
+            ),
+            child: IntrinsicHeight(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -266,6 +269,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                 ),
               ],
             ),
+            ), // IntrinsicHeight
           ),
         ),
       ),

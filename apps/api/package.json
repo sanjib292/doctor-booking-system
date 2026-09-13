@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^5.15.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.4.0",
@@ -31,6 +32,7 @@
     "express-rate-limit": "^7.4.0",
     "express-validator": "^7.1.0",
     "firebase-admin": "^12.3.0",
+    "google-auth-library": "^9.14.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",

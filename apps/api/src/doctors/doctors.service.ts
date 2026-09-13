@@ -222,6 +222,16 @@ export class DoctorsService {
     });
   }
 
+  // Phase 2: Get working days for a doctor (for patient-facing calendar)
+  async getDoctorAvailability(doctorId: string) {
+    const availabilities = await prisma.doctorAvailability.findMany({
+      where: { doctorId, isActive: true },
+      select: { dayOfWeek: true, startTime: true, endTime: true, slotDurationMinutes: true },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+    return availabilities;
+  }
+
   private buildOrderBy(
     sortBy?: string,
     order: 'asc' | 'desc' = 'desc',

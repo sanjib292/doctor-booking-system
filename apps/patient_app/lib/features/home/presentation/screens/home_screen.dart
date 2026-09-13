@@ -53,12 +53,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ],
                             ),
                           ),
-                          IconButton.filled(
-                            onPressed: () => context.pushNamed('notifications'),
-                            icon: const Icon(Icons.notifications_outlined),
-                            style: IconButton.styleFrom(
-                              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                              foregroundColor: theme.colorScheme.onSurface,
+                          Semantics(
+                            label: 'View doctors on map',
+                            child: IconButton.filled(
+                              onPressed: () => context.pushNamed('mapView'),
+                              icon: const Icon(Icons.map_outlined),
+                              style: IconButton.styleFrom(
+                                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                foregroundColor: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Semantics(
+                            label: 'View notifications',
+                            child: IconButton.filled(
+                              onPressed: () => context.pushNamed('notifications'),
+                              icon: const Icon(Icons.notifications_outlined),
+                              style: IconButton.styleFrom(
+                                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                foregroundColor: theme.colorScheme.onSurface,
+                              ),
                             ),
                           ),
                         ],

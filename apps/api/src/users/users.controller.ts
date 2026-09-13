@@ -54,3 +54,25 @@ export const deleteAccount = asyncHandler(async (req: Request, res: Response) =>
   await service.deleteAccount(req.user!.id);
   sendSuccess(res, null, 'Account deleted');
 });
+
+// ─── Medical History (Phase 2) ──────────────────────────────────────
+
+export const getMedicalHistory = asyncHandler(async (req: Request, res: Response) => {
+  const records = await service.getMedicalHistory(req.user!.id);
+  sendSuccess(res, records);
+});
+
+export const createMedicalRecord = asyncHandler(async (req: Request, res: Response) => {
+  const record = await service.createMedicalRecord(req.user!.id, req.body);
+  res.status(201).json({ success: true, data: record, message: 'Medical record created' });
+});
+
+export const updateMedicalRecord = asyncHandler(async (req: Request, res: Response) => {
+  const record = await service.updateMedicalRecord(req.user!.id, req.params.recordId, req.body);
+  sendSuccess(res, record, 'Medical record updated');
+});
+
+export const deleteMedicalRecord = asyncHandler(async (req: Request, res: Response) => {
+  await service.deleteMedicalRecord(req.user!.id, req.params.recordId);
+  sendSuccess(res, null, 'Medical record deleted');
+});

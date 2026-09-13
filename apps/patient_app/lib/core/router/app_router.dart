@@ -13,6 +13,8 @@ import '../../features/appointments/presentation/screens/appointments_screen.dar
 import '../../features/appointments/presentation/screens/appointment_detail_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import '../../features/doctors/presentation/screens/map_screen.dart';
+import '../../features/profile/presentation/screens/medical_history_screen.dart';
 import '../storage/auth_storage.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -125,6 +127,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/notifications',
         name: 'notifications',
         builder: (_, __) => const NotificationsScreen(),
+      ),
+
+      // Phase 2: Map view of nearby doctors
+      GoRoute(
+        path: '/map',
+        name: 'mapView',
+        builder: (_, __) => const MapScreen(),
+      ),
+
+      // Phase 2: Medical history
+      GoRoute(
+        path: '/medical-history',
+        name: 'medicalHistory',
+        builder: (_, __) => const MedicalHistoryScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

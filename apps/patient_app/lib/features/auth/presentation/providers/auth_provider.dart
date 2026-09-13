@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/auth_storage.dart';
 
@@ -44,6 +45,31 @@ class AuthService {
       if (gender != null) 'gender': gender,
       if (age != null) 'age': age,
     });
+  }
+
+  // Phase 2: Google Sign-In
+  Future<void> googleSignIn() async {
+    final googleSignIn = GoogleSignIn(
+      scopes: ['email', 'profile'],
+    );
+
+    final account = await googleSignIn.signIn();
+    if (account == null) throw Exception('Google Sign-In cancelled');
+
+    final auth = await account.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null) throw Exception('Failed to get Google ID token');
+
+    final response = await _dio.post('/auth/patient/google', data: {
+      'idToken': idToken,
+    });
+
+    final data = response.data['data'] as Map<String, dynamic>;
+    await _storage.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+    await _storage.saveUser(data['user'] as Map<String, dynamic>);
   }
 
   Future<void> logout() async {

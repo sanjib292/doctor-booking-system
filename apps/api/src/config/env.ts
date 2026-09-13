@@ -29,6 +29,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
 
+  GOOGLE_CLIENT_ID: z.string().optional(),
+
   CORS_ORIGINS: z.string().default('http://localhost:3001'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),

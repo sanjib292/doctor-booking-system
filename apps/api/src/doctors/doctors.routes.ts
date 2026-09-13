@@ -7,6 +7,7 @@ const router = Router();
 // Public routes
 router.get('/categories', controller.getCategories);
 router.get('/', optionalAuth, controller.searchDoctors);
+router.get('/:id/availability', controller.getDoctorAvailability);  // Phase 2
 router.get('/:id', optionalAuth, controller.getDoctorById);
 
 // Doctor-only routes

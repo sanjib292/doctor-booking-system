@@ -5,6 +5,7 @@ import { generateTokenPair, verifyRefreshToken } from '../common/utils/jwt';
 import { Role } from '@prisma/client';
 import { env } from '../config/env';
 import { logger } from '../common/utils/logger';
+import { OAuth2Client } from 'google-auth-library';
 
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_OTP_ATTEMPTS = 5;
@@ -165,5 +166,68 @@ export class AuthService {
       where: { token: refreshToken },
       data: { isRevoked: true },
     });
+  }
+
+  // ─── Google Sign-In (Phase 2) ──────────────────────────────────────
+  async googleSignIn(
+    idToken: string,
+    fcmToken?: string,
+  ): Promise<{ accessToken: string; refreshToken: string; user: object; isNewUser: boolean }> {
+    const clientId = env.GOOGLE_CLIENT_ID;
+    if (!clientId) throw AppError.badRequest('Google Sign-In is not configured on this server');
+
+    const client = new OAuth2Client(clientId);
+    let payload: any;
+    try {
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      throw AppError.unauthorized('Invalid Google token');
+    }
+
+    if (!payload?.email) throw AppError.badRequest('Google token missing email');
+
+    const googleId = payload.sub as string;
+    const email = payload.email as string;
+    const name = (payload.name as string) || email.split('@')[0];
+    const avatarUrl = payload.picture as string | undefined;
+
+    let isNewUser = false;
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ email }, { phone: `google:${googleId}` }] },
+    });
+
+    if (!user) {
+      isNewUser = true;
+      user = await prisma.user.create({
+        data: {
+          phone: `google:${googleId}`,
+          email,
+          name,
+          avatarUrl,
+          fcmToken,
+          role: Role.PATIENT,
+        },
+      });
+    } else {
+      // Update avatar / fcmToken if changed
+      const updates: Record<string, any> = {};
+      if (avatarUrl && user.avatarUrl !== avatarUrl) updates.avatarUrl = avatarUrl;
+      if (fcmToken && user.fcmToken !== fcmToken) updates.fcmToken = fcmToken;
+      if (Object.keys(updates).length) {
+        user = await prisma.user.update({ where: { id: user.id }, data: updates });
+      }
+    }
+
+    if (user.isBlocked) throw AppError.forbidden('Account is blocked');
+
+    const tokens = generateTokenPair({ id: user.id, role: user.role, phone: user.phone });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.refreshToken.create({
+      data: { token: tokens.refreshToken, userId: user.id, expiresAt },
+    });
+
+    const { passwordHash: _ph, ...safeUser } = user as any;
+    return { ...tokens, user: safeUser, isNewUser };
   }
 }

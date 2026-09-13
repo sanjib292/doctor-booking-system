@@ -65,4 +65,13 @@ router.post('/refresh', validate(refreshTokenSchema), controller.refreshToken);
  */
 router.post('/logout', validate(refreshTokenSchema), controller.logout);
 
+/**
+ * @swagger
+ * /auth/patient/google:
+ *   post:
+ *     summary: Google Sign-In for patients (Phase 2)
+ *     tags: [Auth]
+ */
+router.post('/patient/google', controller.googleSignIn);
+
 export default router;

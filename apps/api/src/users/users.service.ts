@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../common/errors/AppError';
+import { MedicalRecordType } from '@prisma/client';
 
 export class UsersService {
   async getProfile(userId: string) {
@@ -122,6 +123,61 @@ export class UsersService {
     await prisma.refreshToken.updateMany({
       where: { userId },
       data: { isRevoked: true },
+    });
+  }
+
+  // ─── Medical History (Phase 2) ───────────────────────────────────
+
+  async getMedicalHistory(userId: string) {
+    return prisma.medicalRecord.findMany({
+      where: { userId, isActive: true },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createMedicalRecord(
+    userId: string,
+    data: { title: string; type: MedicalRecordType; details?: string; date?: string },
+  ) {
+    return prisma.medicalRecord.create({
+      data: {
+        userId,
+        title: data.title,
+        type: data.type,
+        details: data.details,
+        date: data.date ? new Date(data.date) : null,
+      },
+    });
+  }
+
+  async updateMedicalRecord(
+    userId: string,
+    recordId: string,
+    data: { title?: string; type?: MedicalRecordType; details?: string; date?: string },
+  ) {
+    const record = await prisma.medicalRecord.findFirst({
+      where: { id: recordId, userId, isActive: true },
+    });
+    if (!record) throw AppError.notFound('Medical record');
+
+    return prisma.medicalRecord.update({
+      where: { id: recordId },
+      data: {
+        ...data,
+        date: data.date !== undefined ? (data.date ? new Date(data.date) : null) : undefined,
+      },
+    });
+  }
+
+  async deleteMedicalRecord(userId: string, recordId: string) {
+    const record = await prisma.medicalRecord.findFirst({
+      where: { id: recordId, userId, isActive: true },
+    });
+    if (!record) throw AppError.notFound('Medical record');
+
+    await prisma.medicalRecord.update({
+      where: { id: recordId },
+      data: { isActive: false },
     });
   }
 }

@@ -106,3 +106,31 @@ final doctorDetailProvider = FutureProvider.autoDispose.family<Map<String, dynam
     return response.data['data'] as Map<String, dynamic>;
   },
 );
+
+// Phase 2: Doctor availability (which days of week are they available)
+final doctorAvailabilityProvider =
+    FutureProvider.autoDispose.family<Set<String>, String>((ref, doctorId) async {
+  final dio = ref.watch(dioProvider);
+  try {
+    final response = await dio.get('/doctors/$doctorId/availability');
+    final data = response.data['data'] as List? ?? [];
+    return data.map((a) => a['dayOfWeek'] as String).toSet();
+  } catch (_) {
+    // Fallback: return weekdays if endpoint doesn't exist yet
+    return {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'};
+  }
+});
+
+// Phase 2: Notifier for toggling favorites
+class DoctorsNotifier extends Notifier<void> {
+  @override
+  void build() {}
+
+  Future<void> toggleFavorite(String doctorId) async {
+    final dio = ref.read(dioProvider);
+    await dio.post('/users/me/favorites/$doctorId');
+    ref.invalidate(doctorDetailProvider(doctorId));
+  }
+}
+
+final doctorsProviderFamily = NotifierProvider<DoctorsNotifier, void>(DoctorsNotifier.new);

@@ -47,3 +47,9 @@ export const getCategories = asyncHandler(async (req: Request, res: Response) =>
   const categories = await service.getCategories();
   sendSuccess(res, categories);
 });
+
+// Phase 2: Availability days
+export const getDoctorAvailability = asyncHandler(async (req: Request, res: Response) => {
+  const availability = await service.getDoctorAvailability(req.params.id);
+  sendSuccess(res, availability);
+});

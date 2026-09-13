@@ -38,3 +38,10 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
   await authService.logout(req.body.refreshToken);
   sendSuccess(res, null, 'Logged out successfully');
 });
+
+export const googleSignIn = asyncHandler(async (req: Request, res: Response) => {
+  const { idToken, fcmToken } = req.body;
+  const result = await authService.googleSignIn(idToken, fcmToken);
+  const status = result.isNewUser ? 201 : 200;
+  res.status(status).json({ success: true, data: result });
+});

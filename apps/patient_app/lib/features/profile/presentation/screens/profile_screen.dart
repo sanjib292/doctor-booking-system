@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/storage/auth_storage.dart';
 import '../../../../core/network/api_client.dart';
+// Phase 2: medical history screen imported via router
 
 final _profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final response = await ref.watch(dioProvider).get('/users/me');
@@ -55,6 +56,12 @@ class ProfileScreen extends ConsumerWidget {
                     icon: Icons.notifications_outlined,
                     label: 'Notifications',
                     onTap: () => context.pushNamed('notifications'),
+                  ),
+                  // Phase 2
+                  _SettingItem(
+                    icon: Icons.medical_information_outlined,
+                    label: 'Medical History',
+                    onTap: () => context.pushNamed('medicalHistory'),
                   ),
                 ],
               ),

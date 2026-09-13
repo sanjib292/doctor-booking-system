@@ -111,7 +111,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                     const TextSpan(text: 'Enter the 6-digit OTP sent to '),
                     TextSpan(
                       text: widget.phone,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Theme.of(context).colorScheme.onSurface,
                       ),

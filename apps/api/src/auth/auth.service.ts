@@ -63,10 +63,9 @@ export class AuthService {
     let user = await prisma.user.findUnique({ where: { phone } });
 
     if (!user) {
-      if (!name) throw AppError.badRequest('Name required for new users', 'NAME_REQUIRED');
       isNewUser = true;
       user = await prisma.user.create({
-        data: { phone, name, gender: (gender as any) ?? null, age, fcmToken, role: Role.PATIENT },
+        data: { phone, name: name ?? 'New Patient', gender: (gender as any) ?? null, age, fcmToken, role: Role.PATIENT },
       });
     } else if (fcmToken && user.fcmToken !== fcmToken) {
       user = await prisma.user.update({ where: { id: user.id }, data: { fcmToken } });

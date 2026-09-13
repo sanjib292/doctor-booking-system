@@ -93,7 +93,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         backgroundColor: Colors.transparent,
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,7 +113,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       text: widget.phone,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimaryLight,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],

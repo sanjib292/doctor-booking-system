@@ -48,12 +48,26 @@ io.on('connection', (socket) => {
 
 // ─── Security ────────────────────────────────────────────────────────────────
 app.use(helmet());
+
+const allowedOrigins = env.CORS_ORIGINS.split(',').map(o => o.trim());
 app.use(cors({
-  origin: env.CORS_ORIGINS.split(','),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow any localhost origin (Flutter web dev server uses a random port)
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return callback(null, true);
+    }
+    // Allow explicitly listed origins
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+// Respond to all OPTIONS preflight requests immediately
+app.options('*', cors());
 
 // ─── Rate Limiting ───────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({

@@ -18,15 +18,16 @@ export class AuthService {
       data: { isUsed: true },
     });
 
-    const code = generateOtp(6);
+    // Development mode: OTP is always 123456 for easy testing
+    // In production: replace with real SMS provider (MSG91, Twilio, etc.)
+    const code = '123456';
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await prisma.otpCode.create({
       data: { phone, code, expiresAt },
     });
 
-    // In production: send via SMS provider
-    logger.info(`OTP for ${phone}: ${code}`);
+    logger.info(`OTP for ${phone}: ${code} (hardcoded for testing)`);
 
     return { expiresIn: OTP_EXPIRY_MINUTES * 60 };
   }

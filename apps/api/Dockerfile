@@ -1,36 +1,15 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine
 WORKDIR /app
-RUN apk add --no-cache openssl
 
-# Dependencies stage
-FROM base AS deps
-COPY package*.json ./
-COPY prisma ./prisma/
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --ignore-scripts
 
-# Build stage
-FROM base AS builder
-COPY package*.json ./
-RUN npm ci
+# Copy full source
 COPY . .
-RUN npx prisma generate
-RUN npm run build
 
-# Production stage
-FROM base AS runner
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nodeuser
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-
-RUN chown -R nodeuser:nodejs /app
-USER nodeuser
-
+# Expose port (Railway injects $PORT)
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD ["node", "dist/index.js"]
+# Run schema migration then start API via tsx (no compile step needed)
+CMD ["sh", "-c", "npx tsx src/scripts/migrate.ts && npx tsx src/index.ts"]

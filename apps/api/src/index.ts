@@ -81,9 +81,11 @@ app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', {
 }));
 
 // ─── Health Check ────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
+const healthHandler = (_req: any, res: any) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: env.API_VERSION });
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/v1/health', healthHandler);
 
 // ─── API Routes ──────────────────────────────────────────────────────────────
 const apiPrefix = `/api/${env.API_VERSION}`;

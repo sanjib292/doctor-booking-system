@@ -1,65 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/network/api_client.dart';
 
-/// Nearby doctors map screen using OpenStreetMap via flutter_map.
-/// No API key required — tiles served by OpenStreetMap.org.
-class MapScreen extends StatefulWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen> {
   final MapController _mapController = MapController();
 
   LatLng? _userPosition;
   bool _locating = true;
   String? _locationError;
-
-  // Nearby doctors — in production fetched from GET /doctors?lat=&lng=&radius=10
-  final List<_NearbyDoctor> _doctors = [
-    _NearbyDoctor(
-      id: 'seed-doc-1',
-      name: 'Dr. Rajesh Sharma',
-      specialty: 'Cardiology',
-      rating: 4.8,
-      fee: 800,
-      avatarUrl: '',
-      position: const LatLng(12.9716, 77.5946),
-    ),
-    _NearbyDoctor(
-      id: 'seed-doc-2',
-      name: 'Dr. Priya Nair',
-      specialty: 'Dermatology',
-      rating: 4.6,
-      fee: 600,
-      avatarUrl: '',
-      position: const LatLng(12.9756, 77.5986),
-    ),
-    _NearbyDoctor(
-      id: 'seed-doc-3',
-      name: 'Dr. Arjun Mehta',
-      specialty: 'General Physician',
-      rating: 4.4,
-      fee: 400,
-      avatarUrl: '',
-      position: const LatLng(12.9680, 77.5900),
-    ),
-    _NearbyDoctor(
-      id: 'seed-doc-4',
-      name: 'Dr. Kavitha Rao',
-      specialty: 'Pediatrics',
-      rating: 4.9,
-      fee: 700,
-      avatarUrl: '',
-      position: const LatLng(12.9740, 77.5870),
-    ),
-  ];
+  List<_NearbyDoctor> _doctors = [];
+  bool _loadingDoctors = false;
 
   _NearbyDoctor? _selectedDoctor;
 
@@ -76,11 +38,13 @@ class _MapScreenState extends State<MapScreen> {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.deniedForever) {
+        final fallback = const LatLng(12.9716, 77.5946);
         setState(() {
           _locationError = 'Location permission denied. Showing Bangalore.';
-          _userPosition = const LatLng(12.9716, 77.5946);
+          _userPosition = fallback;
           _locating = false;
         });
+        await _fetchDoctors(fallback);
         return;
       }
 
@@ -88,18 +52,63 @@ class _MapScreenState extends State<MapScreen> {
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
+      final userLatLng = LatLng(pos.latitude, pos.longitude);
       setState(() {
-        _userPosition = LatLng(pos.latitude, pos.longitude);
+        _userPosition = userLatLng;
         _locating = false;
       });
-      _mapController.move(_userPosition!, 14.0);
+      _mapController.move(userLatLng, 14.0);
+      await _fetchDoctors(userLatLng);
     } catch (e) {
-      // Fallback to Bangalore city centre
+      final fallback = const LatLng(12.9716, 77.5946);
       setState(() {
-        _userPosition = const LatLng(12.9716, 77.5946);
+        _userPosition = fallback;
         _locating = false;
         _locationError = 'Using default location: Bangalore';
       });
+      await _fetchDoctors(fallback);
+    }
+  }
+
+  Future<void> _fetchDoctors(LatLng position) async {
+    setState(() => _loadingDoctors = true);
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get('/doctors', queryParameters: {
+        'lat': position.latitude.toString(),
+        'lng': position.longitude.toString(),
+        'radiusKm': '20',
+        'limit': '30',
+        'page': '1',
+        'sortBy': 'distance',
+      });
+      final list = response.data['data'] as List? ?? [];
+      final doctors = <_NearbyDoctor>[];
+      for (final d in list) {
+        final clinics = (d['clinics'] as List?) ?? [];
+        final primaryClinic = clinics.isNotEmpty ? clinics.first as Map : null;
+        final clinicInfo = primaryClinic?['clinic'] as Map?;
+        final lat = clinicInfo?['lat'] as num?;
+        final lng = clinicInfo?['lng'] as num?;
+        if (lat == null || lng == null) continue;
+        doctors.add(_NearbyDoctor(
+          id: d['id'] as String,
+          name: d['name'] as String? ?? '',
+          specialty: (d['specialization'] as String?) ??
+              ((d['categories'] as List?)?.isNotEmpty == true
+                  ? (d['categories'] as List).first['name'] as String? ?? ''
+                  : ''),
+          rating: (d['averageRating'] as num?)?.toDouble() ?? 0,
+          fee: (primaryClinic?['consultationFee'] as num?)?.toInt() ?? 0,
+          avatarUrl: d['avatarUrl'] as String? ?? '',
+          position: LatLng(lat.toDouble(), lng.toDouble()),
+        ));
+      }
+      setState(() => _doctors = doctors);
+    } catch (_) {
+      // silently fail — map still shows user location
+    } finally {
+      setState(() => _loadingDoctors = false);
     }
   }
 
@@ -122,7 +131,6 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Stack(
         children: [
-          // ── Map ──
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -131,14 +139,12 @@ class _MapScreenState extends State<MapScreen> {
               onTap: (_, __) => setState(() => _selectedDoctor = null),
             ),
             children: [
-              // OpenStreetMap tile layer — no API key needed
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.ambytechnologies.patientapp',
                 maxZoom: 19,
               ),
 
-              // User location marker
               if (_userPosition != null)
                 MarkerLayer(markers: [
                   Marker(
@@ -166,7 +172,6 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ]),
 
-              // Doctor markers
               MarkerLayer(
                 markers: _doctors.map((doc) {
                   final isSelected = _selectedDoctor?.id == doc.id;
@@ -200,9 +205,7 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                           child: Icon(
                             Icons.medical_services_rounded,
-                            color: isSelected
-                                ? Colors.white
-                                : theme.colorScheme.primary,
+                            color: isSelected ? Colors.white : theme.colorScheme.primary,
                             size: isSelected ? 28 : 22,
                           ),
                         ),
@@ -212,7 +215,6 @@ class _MapScreenState extends State<MapScreen> {
                 }).toList(),
               ),
 
-              // OSM attribution (required by tile terms)
               const RichAttributionWidget(
                 attributions: [
                   TextSourceAttribution('OpenStreetMap contributors'),
@@ -221,11 +223,35 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
 
-          // ── Loading overlay ──
           if (_locating)
             const Center(child: CircularProgressIndicator()),
 
-          // ── Location error snack ──
+          if (_loadingDoctors && !_locating)
+            const Positioned(
+              bottom: 80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 8),
+                        Text('Loading doctors…'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           if (_locationError != null)
             Positioned(
               top: 12,
@@ -259,7 +285,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
 
-          // ── Doctor count chip ──
           Positioned(
             top: _locationError != null ? 56 : 12,
             right: 16,
@@ -269,10 +294,7 @@ class _MapScreenState extends State<MapScreen> {
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 6,
-                  ),
+                  BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6),
                 ],
               ),
               child: Text(
@@ -286,7 +308,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // ── Selected doctor card ──
           if (_selectedDoctor != null)
             Positioned(
               bottom: 16,
@@ -294,7 +315,7 @@ class _MapScreenState extends State<MapScreen> {
               right: 16,
               child: _DoctorCard(
                 doctor: _selectedDoctor!,
-                onViewProfile: () => context.push('/doctor/${_selectedDoctor!.id}'),
+                onViewProfile: () => context.push('/doctors/${_selectedDoctor!.id}'),
                 onDismiss: () => setState(() => _selectedDoctor = null),
               ),
             ),
@@ -303,8 +324,6 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 }
-
-// ── Doctor card shown at bottom of map ─────────────────────────────────────
 
 class _DoctorCard extends StatelessWidget {
   const _DoctorCard({
@@ -328,21 +347,21 @@ class _DoctorCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // Avatar
             CircleAvatar(
               radius: 28,
               backgroundColor: theme.colorScheme.primaryContainer,
               child: doctor.avatarUrl.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: doctor.avatarUrl,
-                      imageBuilder: (ctx, img) => CircleAvatar(radius: 28, backgroundImage: img),
-                      placeholder: (_, __) => const CircularProgressIndicator(strokeWidth: 2),
+                      imageBuilder: (ctx, img) =>
+                          CircleAvatar(radius: 28, backgroundImage: img),
+                      placeholder: (_, __) =>
+                          const CircularProgressIndicator(strokeWidth: 2),
                       errorWidget: (_, __, ___) => _initials(doctor.name),
                     )
                   : _initials(doctor.name),
             ),
             const SizedBox(width: 14),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,22 +386,20 @@ class _DoctorCard extends StatelessWidget {
                       const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
                       const SizedBox(width: 3),
                       Text(
-                        '${doctor.rating}',
+                        doctor.rating.toStringAsFixed(1),
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(width: 10),
-                      Icon(Icons.currency_rupee, size: 13, color: theme.colorScheme.secondary),
-                      Text(
-                        '${doctor.fee}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                      if (doctor.fee > 0) ...[
+                        const SizedBox(width: 10),
+                        Icon(Icons.currency_rupee, size: 13, color: theme.colorScheme.secondary),
+                        Text('${doctor.fee}', style: const TextStyle(fontSize: 12)),
+                      ],
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            // Actions
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -422,8 +439,6 @@ class _DoctorCard extends StatelessWidget {
     );
   }
 }
-
-// ── Data model ─────────────────────────────────────────────────────────────
 
 class _NearbyDoctor {
   const _NearbyDoctor({

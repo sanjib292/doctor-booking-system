@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 
@@ -15,7 +16,7 @@ final slotsProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic
 );
 
 class AppointmentService {
-  final _dio;
+  final Dio _dio;
 
   AppointmentService(this._dio);
 

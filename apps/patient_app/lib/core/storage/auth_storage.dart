@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../network/api_client.dart';
+import 'platform_storage.dart';
 
 class AuthStorage {
-  final FlutterSecureStorage _storage;
+  final PlatformStorage _storage;
 
   AuthStorage(this._storage);
 

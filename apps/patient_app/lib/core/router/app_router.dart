@@ -42,7 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/otp',
         name: 'otpVerification',
         builder: (_, state) {
-          final phone = state.extra as String;
+          final phone = state.extra as String? ?? '';
           return OtpVerificationScreen(phone: phone);
         },
       ),
@@ -50,10 +50,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/register',
         name: 'registration',
         builder: (_, state) {
-          final data = state.extra as Map<String, dynamic>;
+          final data = (state.extra as Map<String, dynamic>?) ?? {};
           return RegistrationScreen(
-            phone: data['phone'] as String,
-            token: data['token'] as String,
+            phone: data['phone'] as String? ?? '',
+            token: data['token'] as String? ?? '',
           );
         },
       ),
@@ -97,11 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/doctors/:id/book',
         name: 'slotSelection',
         builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = (state.extra as Map<String, dynamic>?) ?? {};
           return SlotSelectionScreen(
             doctorId: state.pathParameters['id']!,
-            clinicId: extra['clinicId'] as String,
-            doctorName: extra['doctorName'] as String,
+            clinicId: extra['clinicId'] as String? ?? '',
+            doctorName: extra['doctorName'] as String? ?? '',
           );
         },
       ),
@@ -109,7 +109,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/booking/confirm',
         name: 'bookingConfirmation',
         builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = (state.extra as Map<String, dynamic>?) ?? {};
           return BookingConfirmationScreen(appointmentData: extra);
         },
       ),
@@ -118,8 +118,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/appointments/:id',
         name: 'appointmentDetail',
-        builder: (_, state) =>
-            AppointmentDetailScreen(appointmentId: state.pathParameters['id']!),
+        builder: (_, state) => AppointmentDetailScreen(
+          appointmentId: state.pathParameters['id']!,
+          appointmentData: state.extra as Map<String, dynamic>?,
+        ),
       ),
 
       // Notifications

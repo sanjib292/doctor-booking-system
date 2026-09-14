@@ -5,7 +5,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/storage/auth_storage.dart';
 import '../../../../core/network/api_client.dart';
-// Phase 2: medical history screen imported via router
 
 final _profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final response = await ref.watch(dioProvider).get('/users/me');
@@ -13,6 +12,103 @@ final _profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) 
 });
 
 final _themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+
+Future<void> _showEditProfile(BuildContext context, WidgetRef ref) async {
+  final profileAsync = ref.read(_profileProvider);
+  final user = profileAsync.valueOrNull ?? {};
+
+  final nameCtrl = TextEditingController(text: user['name'] as String? ?? '');
+  String? gender = user['gender'] as String?;
+  final ageCtrl = TextEditingController(
+    text: user['age'] != null ? '${user['age']}' : '',
+  );
+  bool saving = false;
+
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setModal) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Edit Profile', style: AppTextStyles.titleMedium),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: gender,
+              decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(value: 'MALE', child: Text('Male')),
+                DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+                DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+              ],
+              onChanged: (v) => setModal(() => gender = v),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ageCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Age', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        setModal(() => saving = true);
+                        try {
+                          await ref.read(dioProvider).patch('/users/me', data: {
+                            if (nameCtrl.text.trim().isNotEmpty) 'name': nameCtrl.text.trim(),
+                            if (gender != null) 'gender': gender,
+                            if (ageCtrl.text.trim().isNotEmpty)
+                              'age': int.tryParse(ageCtrl.text.trim()),
+                          });
+                          ref.invalidate(_profileProvider);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text('Failed to save: $e')),
+                            );
+                          }
+                        } finally {
+                          setModal(() => saving = false);
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  nameCtrl.dispose();
+  ageCtrl.dispose();
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -33,7 +129,10 @@ class ProfileScreen extends ConsumerWidget {
             child: profileAsync.when(
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => const SizedBox.shrink(),
-              data: (user) => _ProfileHeader(user: user),
+              data: (user) => _ProfileHeader(
+                user: user,
+                onEdit: () => _showEditProfile(context, ref),
+              ),
             ),
           ),
           SliverList(
@@ -45,12 +144,12 @@ class ProfileScreen extends ConsumerWidget {
                   _SettingItem(
                     icon: Icons.person_outline_rounded,
                     label: 'Edit Profile',
-                    onTap: () {},
+                    onTap: () => _showEditProfile(context, ref),
                   ),
                   _SettingItem(
                     icon: Icons.favorite_outline_rounded,
                     label: 'Saved Doctors',
-                    onTap: () {},
+                    onTap: () => context.pushNamed('search'),
                   ),
                   _SettingItem(
                     icon: Icons.notifications_outlined,
@@ -107,8 +206,9 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.user});
+  const _ProfileHeader({required this.user, required this.onEdit});
   final Map<String, dynamic> user;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +247,10 @@ class _ProfileHeader extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined)),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+          ),
         ],
       ),
     );

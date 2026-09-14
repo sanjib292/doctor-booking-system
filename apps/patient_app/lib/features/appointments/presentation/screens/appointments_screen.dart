@@ -85,6 +85,7 @@ class _AppointmentList extends ConsumerWidget {
                   onTap: () => context.pushNamed(
                     'appointmentDetail',
                     pathParameters: {'id': list[i]['id'] as String},
+                    extra: list[i],
                   ),
                 ),
               ),

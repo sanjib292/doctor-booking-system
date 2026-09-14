@@ -22,7 +22,7 @@ class NotificationsScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () async {
-              await ref.watch(dioProvider).patch('/users/me/notifications/read');
+              await ref.read(dioProvider).patch('/users/me/notifications/read');
               ref.refresh(_notificationsProvider);
             },
             child: const Text('Mark all read'),

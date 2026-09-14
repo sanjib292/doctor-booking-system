@@ -12,6 +12,11 @@ const MAX_OTP_ATTEMPTS = 5;
 
 export class AuthService {
   async sendOtp(phone: string): Promise<{ expiresIn: number }> {
+    // Only allow OTP for existing registered patients
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    if (!existingUser) throw AppError.notFound('Phone number not registered. Please contact support.');
+    if (existingUser.isBlocked) throw AppError.forbidden('Account is blocked');
+
     // Invalidate existing OTPs
     await prisma.otpCode.updateMany({
       where: { phone, isUsed: false },

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../storage/platform_storage.dart';
 
 const String _baseUrl = String.fromEnvironment(
   'API_BASE_URL',
@@ -9,7 +9,7 @@ const String _baseUrl = String.fromEnvironment(
 
 class ApiClient {
   late final Dio dio;
-  final FlutterSecureStorage _storage;
+  final PlatformStorage _storage;
 
   ApiClient(this._storage) {
     dio = Dio(
@@ -32,7 +32,7 @@ class ApiClient {
 }
 
 class _AuthInterceptor extends Interceptor {
-  final FlutterSecureStorage _storage;
+  final PlatformStorage _storage;
   final Dio _dio;
   bool _isRefreshing = false;
 
@@ -113,10 +113,8 @@ class _LogInterceptor extends Interceptor {
 }
 
 // Providers
-final storageProvider = Provider<FlutterSecureStorage>(
-  (_) => const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  ),
+final storageProvider = Provider<PlatformStorage>(
+  (_) => PlatformStorage(),
 );
 
 final apiClientProvider = Provider<ApiClient>(

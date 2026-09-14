@@ -236,6 +236,18 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   },
                   onMonthChanged: (focused) =>
                       setState(() => _focusedDay = focused),
+                  onBook: () {
+                    final clinicId = clinicInfo?['id'] as String? ?? '';
+                    final doctorName = doctor['name'] as String? ?? '';
+                    context.pushNamed(
+                      'slotSelection',
+                      pathParameters: {'id': widget.doctorId},
+                      extra: {
+                        'clinicId': clinicId,
+                        'doctorName': doctorName,
+                      },
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 28),
@@ -395,6 +407,7 @@ class _AvailabilityCalendar extends ConsumerWidget {
     required this.selectedDay,
     required this.onDaySelected,
     required this.onMonthChanged,
+    this.onBook,
   });
 
   final String doctorId;
@@ -402,6 +415,7 @@ class _AvailabilityCalendar extends ConsumerWidget {
   final DateTime? selectedDay;
   final void Function(DateTime, DateTime) onDaySelected;
   final ValueChanged<DateTime> onMonthChanged;
+  final VoidCallback? onBook;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -469,9 +483,7 @@ class _AvailabilityCalendar extends ConsumerWidget {
                       return AppButton(
                         label:
                             'Book on ${DateFormat('EEE, d MMM').format(selectedDay!)}',
-                        onPressed: () {
-                          // navigate to slot selection
-                        },
+                        onPressed: onBook,
                       );
                     },
                   ),

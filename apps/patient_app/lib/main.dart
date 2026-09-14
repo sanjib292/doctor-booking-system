@@ -36,8 +36,9 @@ void main() async {
     // Firebase not configured in dev
   }
 
-  // Hive (local cache)
+  // Hive (local cache + web auth storage)
   await Hive.initFlutter();
+  await Hive.openBox('auth');
 
   runApp(const ProviderScope(child: DoctorBookingApp()));
 }

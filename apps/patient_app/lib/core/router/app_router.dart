@@ -25,10 +25,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: true,
     redirect: (context, state) async {
       final isLoggedIn = await authStorage.isLoggedIn();
-      final isAuthRoute = state.matchedLocation.startsWith('/auth');
+      final loc = state.matchedLocation;
+      final isAuthRoute = loc.startsWith('/auth');
 
       if (!isLoggedIn && !isAuthRoute) return '/auth/phone';
-      if (isLoggedIn && isAuthRoute) return '/home';
+      if (isLoggedIn && (isAuthRoute || loc == '/')) return '/home';
       return null;
     },
     routes: [

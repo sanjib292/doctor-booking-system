@@ -70,7 +70,14 @@ export class AuthService {
     if (!user) {
       isNewUser = true;
       user = await prisma.user.create({
-        data: { phone, name: name ?? 'New Patient', gender: (gender as any) ?? null, age, fcmToken, role: Role.PATIENT },
+        data: {
+          phone,
+          name: name ?? 'New Patient',
+          role: Role.PATIENT,
+          ...(gender ? { gender: gender as any } : {}),
+          ...(age !== undefined && age !== null ? { age } : {}),
+          ...(fcmToken ? { fcmToken } : {}),
+        },
       });
     } else if (fcmToken && user.fcmToken !== fcmToken) {
       user = await prisma.user.update({ where: { id: user.id }, data: { fcmToken } });
@@ -150,7 +157,9 @@ export class AuthService {
 
     await prisma.refreshToken.update({ where: { id: stored.id }, data: { isRevoked: true } });
 
-    const tokens = generateTokenPair(payload);
+    // Strip JWT claims (exp, iat) so generateTokenPair can set fresh ones
+    const { exp: _exp, iat: _iat, ...cleanPayload } = payload as any;
+    const tokens = generateTokenPair(cleanPayload);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await prisma.refreshToken.create({

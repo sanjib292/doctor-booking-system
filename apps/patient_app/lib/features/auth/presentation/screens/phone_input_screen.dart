@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,6 +86,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -116,7 +118,10 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
   Future<void> _sendOtp() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       final phone = '+91${_phoneController.text.trim()}';
@@ -125,14 +130,16 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
       if (mounted) {
         context.pushNamed('otpVerification', extra: phone);
       }
+    } on DioException catch (e) {
+      if (mounted) {
+        final data = e.response?.data;
+        final msg = (data is Map ? data['message'] as String? : null)
+            ?? 'Something went wrong. Please try again.';
+        setState(() => _errorMessage = msg);
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        setState(() => _errorMessage = 'Something went wrong. Please try again.');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -231,6 +238,30 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                     onFieldSubmitted: (_) => _sendOtp(),
                   ),
                 ),
+
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.error.withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 24),
 

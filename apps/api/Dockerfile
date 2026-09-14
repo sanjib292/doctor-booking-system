@@ -1,18 +1,13 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Install dependencies (build context is repo root, so prefix with apps/api/)
-COPY apps/api/package.json apps/api/yarn.lock ./
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --ignore-scripts
 
-# Inject the pg-based Prisma shim (replaces binary Prisma client, no download needed)
-COPY apps/api/prisma-shim/default.js ./node_modules/.prisma/client/default.js
+COPY prisma-shim/default.js ./node_modules/.prisma/client/default.js
 
-# Copy API source
-COPY apps/api/ .
+COPY . .
 
-# Expose port (Railway injects $PORT)
 EXPOSE 3000
 
-# Run schema migration then start API via tsx (no compile step needed)
 CMD ["sh", "-c", "npx tsx src/scripts/migrate.ts && npx tsx src/index.ts"]

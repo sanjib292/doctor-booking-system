@@ -49,8 +49,24 @@ export const getCategories = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, categories);
 });
 
-// Phase 2: Availability days
+// Phase 2: Availability days (public, for patient-facing calendar)
 export const getDoctorAvailability = asyncHandler(async (req: Request, res: Response) => {
   const availability = await service.getDoctorAvailability(req.params.id);
   sendSuccess(res, availability);
+});
+
+// Doctor self-service availability
+export const getMyAvailability = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getMyAvailability(req.user!.id);
+  sendSuccess(res, data);
+});
+
+export const setMyAvailability = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.setMyAvailability(req.user!.id, req.body);
+  sendSuccess(res, data, 'Availability updated');
+});
+
+export const deleteMyAvailabilityDay = asyncHandler(async (req: Request, res: Response) => {
+  await service.deleteMyAvailabilityDay(req.user!.id, req.params.day);
+  sendSuccess(res, null, 'Availability removed');
 });

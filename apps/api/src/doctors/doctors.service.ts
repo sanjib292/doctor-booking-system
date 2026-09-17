@@ -281,6 +281,54 @@ export class DoctorsService {
     return availabilities;
   }
 
+  // Doctor self-service: get own full availability (including inactive)
+  async getMyAvailability(doctorId: string) {
+    return prisma.doctorAvailability.findMany({
+      where: { doctorId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+  }
+
+  // Doctor self-service: set a day's availability
+  async setMyAvailability(doctorId: string, data: {
+    dayOfWeek: string; startTime: string; endTime: string;
+    slotDurationMinutes: number; isActive?: boolean;
+  }) {
+    const existing = await prisma.doctorAvailability.findFirst({
+      where: { doctorId, dayOfWeek: data.dayOfWeek as any },
+    });
+    if (existing) {
+      return prisma.doctorAvailability.update({
+        where: { id: (existing as any).id },
+        data: {
+          startTime: data.startTime,
+          endTime: data.endTime,
+          slotDurationMinutes: data.slotDurationMinutes,
+          isActive: data.isActive ?? true,
+        },
+      });
+    }
+    return prisma.doctorAvailability.create({
+      data: {
+        doctorId,
+        dayOfWeek: data.dayOfWeek as any,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        slotDurationMinutes: data.slotDurationMinutes,
+        isActive: data.isActive ?? true,
+      },
+    });
+  }
+
+  // Doctor self-service: delete a day's availability
+  async deleteMyAvailabilityDay(doctorId: string, dayOfWeek: string) {
+    const existing = await prisma.doctorAvailability.findFirst({
+      where: { doctorId, dayOfWeek: dayOfWeek as any },
+    });
+    if (!existing) throw new Error('Availability not found');
+    return prisma.doctorAvailability.delete({ where: { id: (existing as any).id } });
+  }
+
   private buildOrderBy(
     sortBy?: string,
     order: 'asc' | 'desc' = 'desc',

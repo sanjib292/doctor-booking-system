@@ -40,7 +40,7 @@ final _upcomingProvider =
   return all.where((a) {
     final d = a['date'] as String? ?? '';
     final dateStr = d.length >= 10 ? d.substring(0, 10) : d;
-    return dateStr >= today;
+    return dateStr.compareTo(today) >= 0;
   }).toList();
 });
 
@@ -78,7 +78,7 @@ final _historyProvider =
   return combined.where((a) {
     final d = a['date'] as String? ?? '';
     final dateStr = d.length >= 10 ? d.substring(0, 10) : d;
-    return dateStr <= today;
+    return dateStr.compareTo(today) <= 0;
   }).toList();
 });
 

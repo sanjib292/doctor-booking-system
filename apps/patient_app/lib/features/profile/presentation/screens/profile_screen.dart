@@ -13,101 +13,132 @@ final _profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) 
 
 final _themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
-Future<void> _showEditProfile(BuildContext context, WidgetRef ref) async {
+void _showEditProfile(BuildContext context, WidgetRef ref) {
   final profileAsync = ref.read(_profileProvider);
   final user = profileAsync.valueOrNull ?? {};
 
-  final nameCtrl = TextEditingController(text: user['name'] as String? ?? '');
-  String? gender = user['gender'] as String?;
-  final ageCtrl = TextEditingController(
-    text: user['age'] != null ? '${user['age']}' : '',
-  );
-  bool saving = false;
-
-  await showModalBottomSheet(
+  showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setModal) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Edit Profile', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: gender,
-              decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-              items: const [
-                DropdownMenuItem(value: 'MALE', child: Text('Male')),
-                DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
-                DropdownMenuItem(value: 'OTHER', child: Text('Other')),
-              ],
-              onChanged: (v) => setModal(() => gender = v),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ageCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Age', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: saving
-                    ? null
-                    : () async {
-                        setModal(() => saving = true);
-                        try {
-                          await ref.read(dioProvider).patch('/users/me', data: {
-                            if (nameCtrl.text.trim().isNotEmpty) 'name': nameCtrl.text.trim(),
-                            if (gender != null) 'gender': gender,
-                            if (ageCtrl.text.trim().isNotEmpty)
-                              'age': int.tryParse(ageCtrl.text.trim()),
-                          });
-                          ref.invalidate(_profileProvider);
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text('Failed to save: $e')),
-                            );
-                          }
-                        } finally {
-                          setModal(() => saving = false);
-                        }
-                      },
-                child: saving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('Save'),
-              ),
-            ),
-          ],
-        ),
-      ),
+    builder: (ctx) => _EditProfileSheet(
+      user: user,
+      onSave: (name, gender, age) async {
+        await ref.read(dioProvider).patch('/users/me', data: {
+          if (name.isNotEmpty) 'name': name,
+          if (gender != null) 'gender': gender,
+          if (age != null) 'age': age,
+        });
+        ref.invalidate(_profileProvider);
+        if (ctx.mounted) Navigator.pop(ctx);
+      },
     ),
   );
-  nameCtrl.dispose();
-  ageCtrl.dispose();
+}
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({required this.user, required this.onSave});
+  final Map<String, dynamic> user;
+  final Future<void> Function(String name, String? gender, int? age) onSave;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _ageCtrl;
+  String? _gender;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.user['name'] as String? ?? '');
+    _ageCtrl = TextEditingController(
+      text: widget.user['age'] != null ? '${widget.user['age']}' : '',
+    );
+    _gender = widget.user['gender'] as String?;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _ageCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(_nameCtrl.text.trim(), _gender, int.tryParse(_ageCtrl.text.trim()));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Edit Profile', style: AppTextStyles.titleMedium),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _gender,
+            decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem(value: 'MALE', child: Text('Male')),
+              DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+              DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+            ],
+            onChanged: (v) => setState(() => _gender = v),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ageCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Age', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class ProfileScreen extends ConsumerWidget {

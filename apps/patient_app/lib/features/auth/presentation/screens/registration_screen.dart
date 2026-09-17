@@ -28,11 +28,13 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _ageController = TextEditingController();
 
   String? _gender;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _errorMessage;
 
   @override
@@ -50,6 +52,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _ageController.dispose();
     super.dispose();
   }
@@ -73,7 +76,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
       );
 
       if (mounted) {
-        context.goNamed('otpVerification', extra: phone);
+        context.goNamed('home');
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -177,12 +180,14 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                       margin: const EdgeInsets.all(12),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
+                        color: Theme.of(context).colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '+91',
-                        style: AppTextStyles.labelLarge.copyWith(color: AppColors.primary),
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 0),
@@ -215,6 +220,31 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Password is required';
                     if (v.length < 8) return 'Password must be at least 8 characters';
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                // Confirm Password
+                Text('Confirm Password *', style: AppTextStyles.labelMedium),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    hintText: 'Re-enter your password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      ),
+                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Please confirm your password';
+                    if (v != _passwordController.text) return 'Passwords do not match';
                     return null;
                   },
                 ),
@@ -364,11 +394,11 @@ class _GenderChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? AppColors.primaryContainer
+                ? Theme.of(context).colorScheme.primaryContainer
                 : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? AppColors.primary : Colors.transparent,
+              color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
               width: 1.5,
             ),
           ),
@@ -377,7 +407,7 @@ class _GenderChip extends StatelessWidget {
               Icon(
                 icon,
                 color: selected
-                    ? AppColors.primary
+                    ? Theme.of(context).colorScheme.primary
                     : Theme.of(context).colorScheme.onSurfaceVariant,
                 size: 24,
               ),
@@ -386,7 +416,7 @@ class _GenderChip extends StatelessWidget {
                 label,
                 style: AppTextStyles.labelSmall.copyWith(
                   color: selected
-                      ? AppColors.primary
+                      ? Theme.of(context).colorScheme.primary
                       : Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),

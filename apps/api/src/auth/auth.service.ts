@@ -19,7 +19,7 @@ export class AuthService {
     gender?: string,
     age?: number,
     fcmToken?: string,
-  ): Promise<{ expiresIn: number }> {
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     const [byPhone, byEmail] = await Promise.all([
       prisma.user.findUnique({ where: { phone } }),
       prisma.user.findUnique({ where: { email } }),
@@ -29,7 +29,7 @@ export class AuthService {
 
     const passwordHash = await hashPassword(password);
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         phone,
         email,
@@ -42,8 +42,11 @@ export class AuthService {
       },
     });
 
-    // Send OTP so the patient verifies their phone before getting tokens
-    return this.sendOtp(phone);
+    const tokens = generateTokenPair({ id: user.id, role: user.role, phone: user.phone });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.refreshToken.create({ data: { token: tokens.refreshToken, userId: user.id, expiresAt } });
+    const { passwordHash: _ph, ...safeUser } = user as any;
+    return { ...tokens, user: safeUser };
   }
 
   async sendOtp(phone: string): Promise<{ expiresIn: number }> {
@@ -58,7 +61,8 @@ export class AuthService {
       data: { isUsed: true },
     });
 
-    const code = env.NODE_ENV !== 'production' ? '123456' : generateOtp();
+    const smsConfigured = !!(process.env.TWILIO_ACCOUNT_SID || process.env.SMS_API_KEY);
+    const code = smsConfigured ? generateOtp() : '123456';
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await prisma.otpCode.create({

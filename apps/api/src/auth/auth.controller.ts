@@ -8,7 +8,7 @@ const authService = new AuthService();
 export const registerPatient = asyncHandler(async (req: Request, res: Response) => {
   const { name, email, phone, password, gender, age, fcmToken } = req.body;
   const result = await authService.registerPatient(name, email, phone, password, gender, age, fcmToken);
-  sendCreated(res, result, 'Account created. Check your phone for OTP.');
+  sendCreated(res, result, 'Account created successfully.');
 });
 
 export const sendOtp = asyncHandler(async (req: Request, res: Response) => {

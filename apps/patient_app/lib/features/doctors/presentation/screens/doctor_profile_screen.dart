@@ -48,7 +48,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     final clinicImages = (clinicInfo?['images'] as List?)?.cast<String>() ?? [];
     final categories = (doctor['categories'] as List?) ?? [];
     final specialization = categories.isNotEmpty
-        ? ((categories.first as Map)['category'] as Map?)?['name'] as String? ?? ''
+        ? (((categories.first as Map)['category'] as Map?)?['name'] as String?) ?? ''
         : '';
 
     return CustomScrollView(

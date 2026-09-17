@@ -24,7 +24,8 @@ export class DoctorsService {
   async searchDoctors(filters: DoctorSearchFilters) {
     const { skip, take, page, limit } = buildPagination(filters);
 
-    const where: Prisma.DoctorWhereInput = {
+    // Build raw WHERE clause parts that the shim can handle (flat fields only)
+    const where: any = {
       isActive: true,
       deletedAt: null,
       verificationStatus: 'VERIFIED',
@@ -36,93 +37,102 @@ export class DoctorsService {
         { about: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
+    if (filters.gender) where.gender = filters.gender;
+    if (filters.minRating) where.averageRating = { gte: filters.minRating };
+    if (filters.minExperience) where.experienceYears = { gte: filters.minExperience };
 
-    if (filters.gender) {
-      where.gender = filters.gender as any;
-    }
-
-    if (filters.minRating) {
-      where.averageRating = { gte: filters.minRating };
-    }
-
-    if (filters.minExperience) {
-      where.experienceYears = { gte: filters.minExperience };
-    }
-
-    if (filters.categoryId) {
-      where.categories = { some: { categoryId: filters.categoryId } };
-    }
-
-    if (filters.city) {
-      where.clinics = {
-        some: { clinic: { city: { contains: filters.city, mode: 'insensitive' }, isActive: true } },
-      };
-    }
-
-    if (filters.maxFee || filters.minFee) {
-      where.clinics = {
-        ...((where.clinics as any) ?? {}),
-        some: {
-          ...(((where.clinics as any)?.some) ?? {}),
-          consultationFee: {
-            ...(filters.minFee ? { gte: filters.minFee } : {}),
-            ...(filters.maxFee ? { lte: filters.maxFee } : {}),
-          },
-        },
-      };
-    }
-
-    const [doctors, total] = await Promise.all([
-      prisma.doctor.findMany({
-        where,
-        skip,
-        take,
-        select: {
-          id: true,
-          name: true,
-          avatarUrl: true,
-          qualifications: true,
-          experienceYears: true,
-          averageRating: true,
-          totalReviews: true,
-          languages: true,
-          verificationStatus: true,
-          categories: {
-            select: { category: { select: { id: true, name: true, iconUrl: true } }, isPrimary: true },
-          },
-          clinics: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              consultationFee: true,
-              isPrimary: true,
-              clinic: {
-                select: { id: true, name: true, city: true, lat: true, lng: true, addressLine1: true },
-              },
-            },
-            take: 1,
-          },
-        },
-        orderBy: this.buildOrderBy(filters.sortBy, filters.sortOrder),
-      }),
+    // Fetch flat doctor rows (shim ignores select/include)
+    const [flatDoctors, total] = await Promise.all([
+      prisma.doctor.findMany({ where, skip, take, orderBy: this.buildOrderBy(filters.sortBy, filters.sortOrder) }),
       prisma.doctor.count({ where }),
     ]);
 
-    const enriched = doctors.map((doc) => {
+    if (flatDoctors.length === 0) return buildPaginatedResult([], 0, page, limit);
+
+    const doctorIds = flatDoctors.map((d: any) => d.id);
+
+    // Fetch clinic associations and category associations in parallel
+    const [clinicRows, categoryRows] = await Promise.all([
+      prisma.$queryRaw(
+        `SELECT dc.id, dc."doctorId", dc."consultationFee", dc."isPrimary",
+                c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng, c."addressLine1"
+         FROM doctor_clinics dc
+         JOIN clinics c ON c.id = dc."clinicId"
+         WHERE dc."doctorId" = ANY($1) AND dc."isActive" = true`,
+        doctorIds,
+      ),
+      prisma.$queryRaw(
+        `SELECT dcat."doctorId", dcat."isPrimary",
+                cat.id as "categoryId", cat.name as "categoryName", cat."iconUrl"
+         FROM doctor_categories dcat
+         JOIN categories cat ON cat.id = dcat."categoryId"
+         WHERE dcat."doctorId" = ANY($1)`,
+        doctorIds,
+      ),
+    ]);
+
+    // Group by doctorId
+    const clinicsByDoctor = new Map<string, any[]>();
+    for (const row of clinicRows as any[]) {
+      if (!clinicsByDoctor.has(row.doctorId)) clinicsByDoctor.set(row.doctorId, []);
+      clinicsByDoctor.get(row.doctorId)!.push({
+        id: row.id,
+        consultationFee: row.consultationFee,
+        isPrimary: row.isPrimary,
+        clinic: { id: row.clinicId, name: row.clinicName, city: row.city, lat: row.lat, lng: row.lng, addressLine1: row.addressLine1 },
+      });
+    }
+    const categoriesByDoctor = new Map<string, any[]>();
+    for (const row of categoryRows as any[]) {
+      if (!categoriesByDoctor.has(row.doctorId)) categoriesByDoctor.set(row.doctorId, []);
+      categoriesByDoctor.get(row.doctorId)!.push({
+        isPrimary: row.isPrimary,
+        category: { id: row.categoryId, name: row.categoryName, iconUrl: row.iconUrl },
+      });
+    }
+
+    // Filter by categoryId / city / fee if supplied (post-join)
+    let doctors = flatDoctors.map((doc: any) => {
+      const { passwordHash, ...safe } = doc;
+      return {
+        ...safe,
+        clinics: clinicsByDoctor.get(doc.id) ?? [],
+        categories: categoriesByDoctor.get(doc.id) ?? [],
+      };
+    });
+
+    if (filters.categoryId) {
+      doctors = doctors.filter((d: any) =>
+        d.categories.some((c: any) => c.category.id === filters.categoryId),
+      );
+    }
+    if (filters.city) {
+      const cityLower = filters.city.toLowerCase();
+      doctors = doctors.filter((d: any) =>
+        d.clinics.some((c: any) => c.clinic.city?.toLowerCase().includes(cityLower)),
+      );
+    }
+    if (filters.minFee || filters.maxFee) {
+      doctors = doctors.filter((d: any) =>
+        d.clinics.some((c: any) => {
+          const fee = c.consultationFee ?? 0;
+          return (!filters.minFee || fee >= filters.minFee) && (!filters.maxFee || fee <= filters.maxFee);
+        }),
+      );
+    }
+
+    // Distance enrichment + sort
+    const enriched = doctors.map((doc: any) => {
       let distance: number | null = null;
-      if (filters.lat && filters.lng && doc.clinics[0]?.clinic) {
-        distance = this.haversineKm(
-          filters.lat,
-          filters.lng,
-          doc.clinics[0].clinic.lat,
-          doc.clinics[0].clinic.lng,
-        );
+      const primaryClinic = doc.clinics.find((c: any) => c.isPrimary) ?? doc.clinics[0];
+      if (filters.lat && filters.lng && primaryClinic?.clinic?.lat != null && primaryClinic?.clinic?.lng != null) {
+        distance = this.haversineKm(filters.lat, filters.lng, primaryClinic.clinic.lat, primaryClinic.clinic.lng);
       }
       return { ...doc, distance };
     });
 
     if (filters.sortBy === 'distance' && filters.lat && filters.lng) {
-      enriched.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+      enriched.sort((a: any, b: any) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
     }
 
     return buildPaginatedResult(enriched, total, page, limit);
@@ -131,76 +141,115 @@ export class DoctorsService {
   async getDoctorById(doctorId: string, userId?: string) {
     const doctor = await prisma.doctor.findFirst({
       where: { id: doctorId, isActive: true, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        gender: true,
-        avatarUrl: true,
-        about: true,
-        qualifications: true,
-        experienceYears: true,
-        languages: true,
-        verificationStatus: true,
-        averageRating: true,
-        totalReviews: true,
-        createdAt: true,
-        categories: {
-          select: { category: true, isPrimary: true },
-        },
-        clinics: {
-          where: { isActive: true },
-          include: {
-            clinic: true,
-          },
-        },
-        availabilities: {
-          where: { isActive: true },
-        },
-        reviews: {
-          where: { isVisible: true, deletedAt: null },
-          take: 5,
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            rating: true,
-            comment: true,
-            createdAt: true,
-            patient: { select: { name: true, avatarUrl: true } },
-          },
-        },
-      },
     });
-
     if (!doctor) throw AppError.notFound('Doctor');
+
+    const [clinicRows, categoryRows, availabilities, reviews] = await Promise.all([
+      prisma.$queryRaw(
+        `SELECT dc.*, c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng,
+                c."addressLine1", c."addressLine2", c.pincode, c.phone as "clinicPhone", c."isActive" as "clinicActive"
+         FROM doctor_clinics dc
+         JOIN clinics c ON c.id = dc."clinicId"
+         WHERE dc."doctorId" = $1 AND dc."isActive" = true`,
+        doctorId,
+      ),
+      prisma.$queryRaw(
+        `SELECT dcat."isPrimary", cat.*
+         FROM doctor_categories dcat
+         JOIN categories cat ON cat.id = dcat."categoryId"
+         WHERE dcat."doctorId" = $1`,
+        doctorId,
+      ),
+      prisma.doctorAvailability.findMany({ where: { doctorId, isActive: true } }),
+      prisma.$queryRaw(
+        `SELECT r.id, r.rating, r.comment, r."createdAt",
+                u.name as "patientName", u."avatarUrl" as "patientAvatar"
+         FROM reviews r
+         JOIN users u ON u.id = r."patientId"
+         WHERE r."doctorId" = $1 AND r."isVisible" = true AND r."deletedAt" IS NULL
+         ORDER BY r."createdAt" DESC LIMIT 5`,
+        doctorId,
+      ),
+    ]);
+
+    const clinics = (clinicRows as any[]).map((row) => ({
+      id: row.id,
+      consultationFee: row.consultationFee,
+      isPrimary: row.isPrimary,
+      isActive: row.isActive,
+      clinic: {
+        id: row.clinicId, name: row.clinicName, city: row.city, lat: row.lat, lng: row.lng,
+        addressLine1: row.addressLine1, addressLine2: row.addressLine2, pincode: row.pincode,
+        phone: row.clinicPhone, isActive: row.clinicActive,
+      },
+    }));
+
+    const categories = (categoryRows as any[]).map((row) => ({
+      isPrimary: row.isPrimary,
+      category: { id: row.id, name: row.name, iconUrl: row.iconUrl },
+    }));
+
+    const formattedReviews = (reviews as any[]).map((r) => ({
+      id: r.id, rating: r.rating, comment: r.comment, createdAt: r.createdAt,
+      patient: { name: r.patientName, avatarUrl: r.patientAvatar },
+    }));
 
     let isFavorite = false;
     if (userId) {
-      const fav = await prisma.favorite.findUnique({
-        where: { userId_doctorId: { userId, doctorId } },
-      });
+      const fav = await prisma.favorite.findFirst({ where: { userId, doctorId } });
       isFavorite = !!fav;
     }
 
-    return { ...doctor, isFavorite };
+    const { passwordHash, ...safe } = doctor as any;
+    return { ...safe, clinics, categories, availabilities, reviews: formattedReviews, isFavorite };
   }
 
   async getDoctorProfile(doctorId: string) {
-    const doctor = await prisma.doctor.findUnique({
-      where: { id: doctorId },
-      include: {
-        categories: { include: { category: true } },
-        clinics: { include: { clinic: true } },
-        availabilities: true,
-        vacations: { where: { endDate: { gte: new Date() } } },
-        blockedDates: { where: { date: { gte: new Date() } } },
-      },
-    });
-
+    const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
     if (!doctor) throw AppError.notFound('Doctor');
-    const { passwordHash, ...safe } = doctor;
-    return safe;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const [clinicRows, categoryRows, availabilities, vacations, blockedDates] = await Promise.all([
+      prisma.$queryRaw(
+        `SELECT dc.*, c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng,
+                c."addressLine1", c."addressLine2", c.pincode, c.phone as "clinicPhone"
+         FROM doctor_clinics dc
+         JOIN clinics c ON c.id = dc."clinicId"
+         WHERE dc."doctorId" = $1`,
+        doctorId,
+      ),
+      prisma.$queryRaw(
+        `SELECT dcat."isPrimary", cat.*
+         FROM doctor_categories dcat
+         JOIN categories cat ON cat.id = dcat."categoryId"
+         WHERE dcat."doctorId" = $1`,
+        doctorId,
+      ),
+      prisma.doctorAvailability.findMany({ where: { doctorId } }),
+      prisma.$queryRaw(
+        `SELECT * FROM doctor_vacations WHERE "doctorId" = $1 AND "endDate" >= $2`,
+        doctorId, today,
+      ),
+      prisma.$queryRaw(
+        `SELECT * FROM blocked_dates WHERE "doctorId" = $1 AND date >= $2`,
+        doctorId, today,
+      ),
+    ]);
+
+    const clinics = (clinicRows as any[]).map((row) => ({
+      id: row.id, consultationFee: row.consultationFee, isPrimary: row.isPrimary, isActive: row.isActive,
+      clinic: { id: row.clinicId, name: row.clinicName, city: row.city, lat: row.lat, lng: row.lng,
+        addressLine1: row.addressLine1, addressLine2: row.addressLine2, pincode: row.pincode, phone: row.clinicPhone },
+    }));
+
+    const categories = (categoryRows as any[]).map((row) => ({
+      isPrimary: row.isPrimary,
+      category: { id: row.id, name: row.name, iconUrl: row.iconUrl },
+    }));
+
+    const { passwordHash, ...safe } = doctor as any;
+    return { ...safe, clinics, categories, availabilities, vacations, blockedDates };
   }
 
   async updateDoctorProfile(

@@ -24,21 +24,6 @@ class DoctorSearchScreen extends ConsumerStatefulWidget {
 class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   final _searchController = TextEditingController();
   String? _selectedSort = 'rating';
-  String? _activeCategoryId;
-  String? _activeCategoryName;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialCategoryId != null) {
-      _activeCategoryId = widget.initialCategoryId;
-      _activeCategoryName = widget.initialCategoryName;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(doctorSearchFiltersProvider.notifier).state =
-            DoctorSearchFilters(categoryId: widget.initialCategoryId);
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -46,10 +31,18 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     super.dispose();
   }
 
+  void _clearCategory() {
+    ref.read(doctorSearchFiltersProvider.notifier).state =
+        ref.read(doctorSearchFiltersProvider).copyWith(categoryId: null);
+    ref.read(activeCategoryNameProvider.notifier).state = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final doctors = ref.watch(searchedDoctorsProvider);
+    final activeCategoryId = ref.watch(doctorSearchFiltersProvider).categoryId;
+    final activeCategoryName = ref.watch(activeCategoryNameProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -95,25 +88,17 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
             ),
 
             // Active category filter chip
-            if (_activeCategoryId != null)
+            if (activeCategoryId != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                 child: Row(
                   children: [
                     FilterChip(
-                      label: Text(_activeCategoryName ?? 'Category'),
+                      label: Text(activeCategoryName ?? 'Category'),
                       selected: true,
-                      onSelected: (_) {
-                        setState(() { _activeCategoryId = null; _activeCategoryName = null; });
-                        ref.read(doctorSearchFiltersProvider.notifier).state =
-                            ref.read(doctorSearchFiltersProvider).copyWith(categoryId: null);
-                      },
+                      onSelected: (_) => _clearCategory(),
                       deleteIcon: const Icon(Icons.close, size: 14),
-                      onDeleted: () {
-                        setState(() { _activeCategoryId = null; _activeCategoryName = null; });
-                        ref.read(doctorSearchFiltersProvider.notifier).state =
-                            ref.read(doctorSearchFiltersProvider).copyWith(categoryId: null);
-                      },
+                      onDeleted: () => _clearCategory(),
                     ),
                   ],
                 ),
@@ -364,6 +349,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 gender: _gender,
                 city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : null,
               );
+              ref.read(activeCategoryNameProvider.notifier).state = null;
               Navigator.pop(context);
             },
             style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 52)),

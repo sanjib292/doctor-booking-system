@@ -56,6 +56,9 @@ final doctorSearchFiltersProvider = StateProvider<DoctorSearchFilters>(
   (_) => const DoctorSearchFilters(),
 );
 
+// Tracks the display name of the currently active category filter
+final activeCategoryNameProvider = StateProvider<String?>((_) => null);
+
 class DoctorSearchFilters {
   const DoctorSearchFilters({
     this.search,

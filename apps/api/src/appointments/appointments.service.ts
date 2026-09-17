@@ -19,8 +19,8 @@ export class AppointmentsService {
     if (!availability) return [];
 
     // Check vacation/blocked
-    const isBlocked = await prisma.blockedDate.findUnique({
-      where: { doctorId_date: { doctorId, date: targetDate } },
+    const isBlocked = await prisma.blockedDate.findFirst({
+      where: { doctorId, date: targetDate },
     });
     if (isBlocked) return [];
 
@@ -42,15 +42,18 @@ export class AppointmentsService {
       availability.breakEnd ?? undefined,
     );
 
-    // Upsert all generated slots in DB
+    // Upsert all generated slots in DB (shim doesn't support compound unique keys so use findFirst + create)
     await Promise.all(
-      slots.map((s) =>
-        prisma.timeSlot.upsert({
-          where: { doctorId_clinicId_date_startTime: { doctorId, clinicId, date: targetDate, startTime: s.start } },
-          create: { doctorId, clinicId, date: targetDate, startTime: s.start, endTime: s.end, status: SlotStatus.AVAILABLE },
-          update: {},
-        }),
-      ),
+      slots.map(async (s) => {
+        const existing = await prisma.timeSlot.findFirst({
+          where: { doctorId, clinicId, date: targetDate, startTime: s.start },
+        });
+        if (!existing) {
+          await prisma.timeSlot.create({
+            data: { doctorId, clinicId, date: targetDate, startTime: s.start, endTime: s.end, status: SlotStatus.AVAILABLE },
+          });
+        }
+      }),
     );
 
     // Release expired locks
@@ -125,7 +128,7 @@ export class AppointmentsService {
       });
       if (booked.count === 0) throw AppError.conflict('Slot was just taken. Please choose another.');
 
-      // Create appointment
+      // Create appointment (shim ignores include, so fetch doctor/clinic separately)
       const appointment = await tx.appointment.create({
         data: {
           patientId,
@@ -138,10 +141,6 @@ export class AppointmentsService {
           status: AppointmentStatus.CONFIRMED,
           notes,
         },
-        include: {
-          doctor: { select: { name: true, avatarUrl: true } },
-          clinic: { select: { name: true, addressLine1: true } },
-        },
       });
 
       // Record status history
@@ -153,7 +152,17 @@ export class AppointmentsService {
         },
       });
 
-      return appointment;
+      // Fetch doctor and clinic names for the confirmation response
+      const [doctorData, clinicData] = await Promise.all([
+        tx.doctor.findFirst({ where: { id: doctorId } }),
+        tx.clinic.findFirst({ where: { id: clinicId } }),
+      ]);
+
+      return {
+        ...appointment,
+        doctor: doctorData ? { name: (doctorData as any).name, avatarUrl: (doctorData as any).avatarUrl } : null,
+        clinic: clinicData ? { name: (clinicData as any).name, addressLine1: (clinicData as any).addressLine1 } : null,
+      };
     });
   }
 

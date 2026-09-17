@@ -350,10 +350,13 @@ class _CategoriesSection extends ConsumerWidget {
             ));
             final icon = _categoryIcon(cat['name'] as String? ?? '');
             return GestureDetector(
-              onTap: () => context.goNamed(
-                'search',
-                extra: {'categoryId': cat['id'], 'categoryName': cat['name']},
-              ),
+              onTap: () {
+                ref.read(doctorSearchFiltersProvider.notifier).state =
+                    DoctorSearchFilters(categoryId: cat['id'] as String);
+                ref.read(activeCategoryNameProvider.notifier).state =
+                    cat['name'] as String;
+                context.goNamed('search');
+              },
               child: Column(
                 children: [
                   Container(

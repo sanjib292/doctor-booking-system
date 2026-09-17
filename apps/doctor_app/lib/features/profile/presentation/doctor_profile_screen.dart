@@ -1,32 +1,13 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-
-const _baseUrl = String.fromEnvironment('API_BASE_URL',
-    defaultValue: 'https://doctor-booking-system-production-2bf8.up.railway.app/api/v1');
-
-const _storage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
-);
-
-final _dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(baseUrl: _baseUrl));
-  dio.interceptors.add(InterceptorsWrapper(
-    onRequest: (opts, handler) async {
-      final token = await _storage.read(key: 'access_token');
-      if (token != null) opts.headers['Authorization'] = 'Bearer $token';
-      handler.next(opts);
-    },
-  ));
-  return dio;
-});
+import '../../../core/network/api_client.dart';
 
 final _profileProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final response =
-      await ref.watch(_dioProvider).get('/doctors/me/profile');
+      await ref.watch(dioProvider).get('/doctors/me/profile');
   return Map<String, dynamic>.from(response.data['data'] as Map);
 });
 
@@ -100,7 +81,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await ref.read(_dioProvider).patch('/doctors/me/profile', data: {
+      await ref.read(dioProvider).patch('/doctors/me/profile', data: {
         'about': _aboutCtrl.text.trim(),
       });
       ref.invalidate(_profileProvider);
@@ -281,7 +262,10 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           // Logout
           OutlinedButton.icon(
             onPressed: () async {
-              await _storage.deleteAll();
+              const storage = FlutterSecureStorage(
+                aOptions: AndroidOptions(encryptedSharedPreferences: true),
+              );
+              await storage.deleteAll();
               if (context.mounted) context.go('/login');
             },
             icon: const Icon(Icons.logout_rounded, color: Colors.red),

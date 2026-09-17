@@ -1,26 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-const _baseUrl = String.fromEnvironment('API_BASE_URL',
-    defaultValue: 'https://doctor-booking-system-production-2bf8.up.railway.app/api/v1');
-
-const _storage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
-);
-
-final _dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(baseUrl: _baseUrl));
-  dio.interceptors.add(InterceptorsWrapper(
-    onRequest: (opts, handler) async {
-      final token = await _storage.read(key: 'access_token');
-      if (token != null) opts.headers['Authorization'] = 'Bearer $token';
-      handler.next(opts);
-    },
-  ));
-  return dio;
-});
+import '../../../core/network/api_client.dart';
 
 String _today() {
   final n = DateTime.now();
@@ -30,7 +10,7 @@ String _today() {
 // Upcoming: future CONFIRMED appointments
 final _upcomingProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final dio = ref.watch(_dioProvider);
+  final dio = ref.watch(dioProvider);
   final response = await dio.get('/appointments/doctor/list', queryParameters: {
     'status': 'CONFIRMED',
     'limit': '50',
@@ -47,7 +27,7 @@ final _upcomingProvider =
 // Today: all appointments for today's date
 final _todayProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final dio = ref.watch(_dioProvider);
+  final dio = ref.watch(dioProvider);
   final response = await dio.get('/appointments/doctor/list', queryParameters: {
     'date': _today(),
     'limit': '50',
@@ -58,7 +38,7 @@ final _todayProvider =
 // History: past COMPLETED or CANCELLED
 final _historyProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final dio = ref.watch(_dioProvider);
+  final dio = ref.watch(dioProvider);
   final [completedRes, cancelledRes] = await Future.wait([
     dio.get('/appointments/doctor/list',
         queryParameters: {'status': 'COMPLETED', 'limit': '50'}),
@@ -316,7 +296,7 @@ class _StatusActionsState extends ConsumerState<_StatusActions> {
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _loading = true);
     try {
-      final dio = ref.read(_dioProvider);
+      final dio = ref.read(dioProvider);
       await dio.patch('/appointments/${widget.apptId}/status',
           data: {'status': newStatus});
       widget.onUpdated();

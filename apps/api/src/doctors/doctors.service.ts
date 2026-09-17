@@ -147,7 +147,7 @@ export class DoctorsService {
     const [clinicRows, categoryRows, availabilities, reviews] = await Promise.all([
       prisma.$queryRaw(
         `SELECT dc.*, c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng,
-                c."addressLine1", c."addressLine2", c.pincode, c.phone as "clinicPhone", c."isActive" as "clinicActive"
+                c."addressLine1", c."addressLine2", c."postalCode", c.phone as "clinicPhone", c."isActive" as "clinicActive"
          FROM doctor_clinics dc
          JOIN clinics c ON c.id = dc."clinicId"
          WHERE dc."doctorId" = $1 AND dc."isActive" = true`,
@@ -179,7 +179,7 @@ export class DoctorsService {
       isActive: row.isActive,
       clinic: {
         id: row.clinicId, name: row.clinicName, city: row.city, lat: row.lat, lng: row.lng,
-        addressLine1: row.addressLine1, addressLine2: row.addressLine2, pincode: row.pincode,
+        addressLine1: row.addressLine1, addressLine2: row.addressLine2, postalCode: row.postalCode,
         phone: row.clinicPhone, isActive: row.clinicActive,
       },
     }));
@@ -213,7 +213,7 @@ export class DoctorsService {
     const [clinicRows, categoryRows, availabilities, vacations, blockedDates] = await Promise.all([
       prisma.$queryRaw(
         `SELECT dc.*, c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng,
-                c."addressLine1", c."addressLine2", c.pincode, c.phone as "clinicPhone"
+                c."addressLine1", c."addressLine2", c."postalCode", c.phone as "clinicPhone"
          FROM doctor_clinics dc
          JOIN clinics c ON c.id = dc."clinicId"
          WHERE dc."doctorId" = $1`,
@@ -240,7 +240,7 @@ export class DoctorsService {
     const clinics = (clinicRows as any[]).map((row) => ({
       id: row.id, consultationFee: row.consultationFee, isPrimary: row.isPrimary, isActive: row.isActive,
       clinic: { id: row.clinicId, name: row.clinicName, city: row.city, lat: row.lat, lng: row.lng,
-        addressLine1: row.addressLine1, addressLine2: row.addressLine2, pincode: row.pincode, phone: row.clinicPhone },
+        addressLine1: row.addressLine1, addressLine2: row.addressLine2, postalCode: row.postalCode, phone: row.clinicPhone },
     }));
 
     const categories = (categoryRows as any[]).map((row) => ({

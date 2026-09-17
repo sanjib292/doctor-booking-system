@@ -1,30 +1,12 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-
-const _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://doctor-booking-system-production-2bf8.up.railway.app/api/v1');
-
-final _dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(baseUrl: _baseUrl));
-  dio.interceptors.add(InterceptorsWrapper(
-    onRequest: (opts, handler) async {
-      const storage = FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
-      );
-      final token = await storage.read(key: 'access_token');
-      if (token != null) opts.headers['Authorization'] = 'Bearer $token';
-      handler.next(opts);
-    },
-  ));
-  return dio;
-});
+import '../../../core/network/api_client.dart';
 
 final _todayApptsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final now = DateTime.now();
   final date = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
-  final response = await ref.watch(_dioProvider).get(
+  final response = await ref.watch(dioProvider).get(
     '/appointments/doctor/list',
     queryParameters: {'date': date, 'limit': '50'},
   );

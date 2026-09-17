@@ -314,23 +314,24 @@ export class AuthService {
     return { ...tokens, user: safeUser, isNewUser };
   }
 
-  // ─── One-time seed (locked once admin exists) ──────────────────────
+  // ─── Seed / reset known accounts ──────────────────────────────────
   async initSeed(): Promise<object> {
-    const existing = await prisma.admin.findFirst();
-    if (existing) throw AppError.conflict('Seed already applied');
-
     const [adminHash, doctorHash, doctor2Hash] = await Promise.all([
       hashPassword('Admin@123456'),
       hashPassword('Doctor@123456'),
       hashPassword('Doctor@123456'),
     ]);
 
-    const admin = await prisma.admin.create({
-      data: { email: 'admin@doctorbooking.com', passwordHash: adminHash, name: 'Super Admin', role: 'SUPER_ADMIN' as any },
+    const admin = await prisma.admin.upsert({
+      where: { email: 'admin@doctorbooking.com' },
+      update: { passwordHash: adminHash, name: 'Super Admin' },
+      create: { email: 'admin@doctorbooking.com', passwordHash: adminHash, name: 'Super Admin', role: 'SUPER_ADMIN' as any },
     });
 
-    const doctor1 = await prisma.doctor.create({
-      data: {
+    const doctor1 = await prisma.doctor.upsert({
+      where: { email: 'dr.sharma@doctorbooking.com' },
+      update: { passwordHash: doctorHash, isActive: true, verificationStatus: 'VERIFIED' as any },
+      create: {
         email: 'dr.sharma@doctorbooking.com',
         passwordHash: doctorHash,
         name: 'Dr. Rajesh Sharma',
@@ -348,8 +349,10 @@ export class AuthService {
       },
     });
 
-    const doctor2 = await prisma.doctor.create({
-      data: {
+    const doctor2 = await prisma.doctor.upsert({
+      where: { email: 'dr.priya@doctorbooking.com' },
+      update: { passwordHash: doctor2Hash, isActive: true, verificationStatus: 'VERIFIED' as any },
+      create: {
         email: 'dr.priya@doctorbooking.com',
         passwordHash: doctor2Hash,
         name: 'Dr. Priya Nair',

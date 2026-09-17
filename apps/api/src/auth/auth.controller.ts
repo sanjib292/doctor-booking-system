@@ -57,3 +57,8 @@ export const googleSignIn = asyncHandler(async (req: Request, res: Response) => 
   const status = result.isNewUser ? 201 : 200;
   res.status(status).json({ success: true, data: result });
 });
+
+export const initSeed = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await authService.initSeed();
+  sendCreated(res, result, 'Seed completed');
+});

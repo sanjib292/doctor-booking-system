@@ -313,4 +313,64 @@ export class AuthService {
     const { passwordHash: _ph, ...safeUser } = user as any;
     return { ...tokens, user: safeUser, isNewUser };
   }
+
+  // ─── One-time seed (locked once admin exists) ──────────────────────
+  async initSeed(): Promise<object> {
+    const existing = await prisma.admin.findFirst();
+    if (existing) throw AppError.conflict('Seed already applied');
+
+    const [adminHash, doctorHash, doctor2Hash] = await Promise.all([
+      hashPassword('Admin@123456'),
+      hashPassword('Doctor@123456'),
+      hashPassword('Doctor@123456'),
+    ]);
+
+    const admin = await prisma.admin.create({
+      data: { email: 'admin@doctorbooking.com', passwordHash: adminHash, name: 'Super Admin', role: 'SUPER_ADMIN' as any },
+    });
+
+    const doctor1 = await prisma.doctor.create({
+      data: {
+        email: 'dr.sharma@doctorbooking.com',
+        passwordHash: doctorHash,
+        name: 'Dr. Rajesh Sharma',
+        phone: '+91-9876543211',
+        gender: 'MALE' as any,
+        about: 'Senior Cardiologist with 15+ years experience.',
+        qualifications: ['MBBS', 'MD (Cardiology)', 'DM (Cardiology)'],
+        experienceYears: 15,
+        languages: ['English', 'Hindi'],
+        verificationStatus: 'VERIFIED' as any,
+        verifiedAt: new Date(),
+        isActive: true,
+        averageRating: 4.8,
+        totalReviews: 127,
+      },
+    });
+
+    const doctor2 = await prisma.doctor.create({
+      data: {
+        email: 'dr.priya@doctorbooking.com',
+        passwordHash: doctor2Hash,
+        name: 'Dr. Priya Nair',
+        phone: '+91-9876543212',
+        gender: 'FEMALE' as any,
+        about: 'Specialist in Neurology with focus on movement disorders.',
+        qualifications: ['MBBS', 'MD (Neurology)', 'DM (Neurology)'],
+        experienceYears: 12,
+        languages: ['English', 'Hindi', 'Malayalam'],
+        verificationStatus: 'VERIFIED' as any,
+        verifiedAt: new Date(),
+        isActive: true,
+        averageRating: 4.6,
+        totalReviews: 89,
+      },
+    });
+
+    return {
+      admin: admin.email,
+      doctors: [doctor1.email, doctor2.email],
+      passwords: { admin: 'Admin@123456', doctors: 'Doctor@123456' },
+    };
+  }
 }

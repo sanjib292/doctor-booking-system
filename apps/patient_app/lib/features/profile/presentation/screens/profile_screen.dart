@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/storage/auth_storage.dart';
@@ -10,8 +11,6 @@ final _profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) 
   final response = await ref.watch(dioProvider).get('/users/me');
   return response.data['data'] as Map<String, dynamic>;
 });
-
-final _themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 void _showEditProfile(BuildContext context, WidgetRef ref) {
   final profileAsync = ref.read(_profileProvider);
@@ -147,7 +146,7 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(_profileProvider);
-    final themeMode = ref.watch(_themeModeProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -199,7 +198,7 @@ class ProfileScreen extends ConsumerWidget {
                 title: 'Preferences',
                 items: [
                   _ThemeToggle(themeMode: themeMode, onChanged: (mode) {
-                    ref.read(_themeModeProvider.notifier).state = mode;
+                    ref.read(themeModeProvider.notifier).set(mode);
                   }),
                 ],
               ),

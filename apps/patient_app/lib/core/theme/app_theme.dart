@@ -133,7 +133,16 @@ abstract final class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: isLight ? AppColors.surfaceVariantLight : AppColors.surfaceVariantDark,
         selectedColor: AppColors.primaryContainer,
-        labelStyle: AppTextStyles.labelMedium,
+        labelStyle: AppTextStyles.labelMedium.copyWith(
+          color: isLight ? AppColors.textPrimaryLight : AppColors.textPrimaryDark,
+        ),
+        secondaryLabelStyle: AppTextStyles.labelMedium.copyWith(
+          color: AppColors.primary,
+        ),
+        iconTheme: IconThemeData(
+          color: isLight ? AppColors.textSecondaryLight : AppColors.textSecondaryDark,
+          size: 18,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         side: BorderSide.none,

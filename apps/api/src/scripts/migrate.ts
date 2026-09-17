@@ -402,6 +402,11 @@ async function migrate() {
       }
     }
 
+    // Add passwordHash column to users if not present (for patient registration flow)
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
+    `);
+
     console.log('[migrate] ✅ Schema and seed complete.');
   } finally {
     client.release();

@@ -34,6 +34,31 @@ class AuthService {
     return data;
   }
 
+  Future<void> registerPatient({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    String? gender,
+    int? age,
+  }) async {
+    final response = await _dio.post('/auth/patient/register', data: {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'password': password,
+      if (gender != null) 'gender': gender,
+      if (age != null) 'age': age,
+    });
+
+    final data = response.data['data'] as Map<String, dynamic>;
+    await _storage.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+    await _storage.saveUser(data['user'] as Map<String, dynamic>);
+  }
+
   Future<void> completeRegistration({
     required String name,
     String? gender,

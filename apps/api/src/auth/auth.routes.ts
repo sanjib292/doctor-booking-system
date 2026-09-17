@@ -4,6 +4,7 @@ import { validate } from '../common/middleware/validate';
 import {
   sendOtpSchema,
   verifyOtpSchema,
+  registerPatientSchema,
   doctorLoginSchema,
   adminLoginSchema,
   refreshTokenSchema,
@@ -18,6 +19,7 @@ const router = Router();
  *     summary: Send OTP to patient phone
  *     tags: [Auth]
  */
+router.post('/patient/register', validate(registerPatientSchema), controller.registerPatient);
 router.post('/patient/send-otp', validate(sendOtpSchema), controller.sendOtp);
 
 /**

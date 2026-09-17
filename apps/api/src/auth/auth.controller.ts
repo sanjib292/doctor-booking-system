@@ -5,6 +5,12 @@ import { asyncHandler } from '../common/middleware/asyncHandler';
 
 const authService = new AuthService();
 
+export const registerPatient = asyncHandler(async (req: Request, res: Response) => {
+  const { name, email, phone, password, gender, age, fcmToken } = req.body;
+  const result = await authService.registerPatient(name, email, phone, password, gender, age, fcmToken);
+  sendCreated(res, result, 'Registration successful');
+});
+
 export const sendOtp = asyncHandler(async (req: Request, res: Response) => {
   const result = await authService.sendOtp(req.body.phone);
   sendSuccess(res, result, 'OTP sent successfully');

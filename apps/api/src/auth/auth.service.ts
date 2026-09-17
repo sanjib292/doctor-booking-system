@@ -11,6 +11,46 @@ const OTP_EXPIRY_MINUTES = 10;
 const MAX_OTP_ATTEMPTS = 5;
 
 export class AuthService {
+  async registerPatient(
+    name: string,
+    email: string,
+    phone: string,
+    password: string,
+    gender?: string,
+    age?: number,
+    fcmToken?: string,
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
+    const existing = await prisma.user.findFirst({
+      where: { OR: [{ phone }, { email }] },
+    });
+    if (existing?.phone === phone) throw AppError.conflict('Phone number is already registered');
+    if (existing?.email === email) throw AppError.conflict('Email is already registered');
+
+    const passwordHash = await hashPassword(password);
+
+    const user = await prisma.user.create({
+      data: {
+        phone,
+        email,
+        name,
+        passwordHash,
+        role: Role.PATIENT,
+        ...(gender ? { gender: gender as any } : {}),
+        ...(age !== undefined && age !== null ? { age } : {}),
+        ...(fcmToken ? { fcmToken } : {}),
+      },
+    });
+
+    const tokens = generateTokenPair({ id: user.id, role: user.role, phone: user.phone });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.refreshToken.create({
+      data: { token: tokens.refreshToken, userId: user.id, expiresAt },
+    });
+
+    const { passwordHash: _ph, ...safeUser } = user as any;
+    return { ...tokens, user: safeUser };
+  }
+
   async sendOtp(phone: string): Promise<{ expiresIn: number }> {
     // Only allow OTP for existing registered patients
     const existingUser = await prisma.user.findUnique({ where: { phone } });

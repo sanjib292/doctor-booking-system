@@ -50,13 +50,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth/register',
         name: 'registration',
-        builder: (_, state) {
-          final data = (state.extra as Map<String, dynamic>?) ?? {};
-          return RegistrationScreen(
-            phone: data['phone'] as String? ?? '',
-            token: data['token'] as String? ?? '',
-          );
-        },
+        builder: (_, __) => const RegistrationScreen(),
       ),
 
       // Main shell

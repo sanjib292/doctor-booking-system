@@ -86,6 +86,7 @@ model User {
   id                String    @id @default(uuid())
   phone             String    @unique
   email             String?   @unique
+  passwordHash      String?
   name              String
   gender            Gender?
   age               Int?

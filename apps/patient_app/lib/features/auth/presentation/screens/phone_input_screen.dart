@@ -271,6 +271,31 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                   isLoading: _isLoading,
                 ),
 
+                const SizedBox(height: 12),
+
+                Center(
+                  child: GestureDetector(
+                    onTap: () => context.pushNamed('registration'),
+                    child: RichText(
+                      text: TextSpan(
+                        text: 'New here? ',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Create an account',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 20),
 
                 // ── Google Sign-In (Phase 2) ──────────────────────

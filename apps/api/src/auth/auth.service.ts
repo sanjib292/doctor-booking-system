@@ -138,11 +138,17 @@ export class AuthService {
     password: string,
     fcmToken?: string,
   ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
-    // Find by phone or email
     const isPhone = /^\+?[0-9]{10,15}$/.test(identifier.replace(/\s/g, ''));
-    const user = isPhone
-      ? await prisma.user.findUnique({ where: { phone: identifier } })
-      : await prisma.user.findUnique({ where: { email: identifier } });
+    let user = null;
+    if (isPhone) {
+      // Try as-is first, then with +91 prefix (registration always stores with country code)
+      user = await prisma.user.findUnique({ where: { phone: identifier } });
+      if (!user && !identifier.startsWith('+')) {
+        user = await prisma.user.findUnique({ where: { phone: `+91${identifier}` } });
+      }
+    } else {
+      user = await prisma.user.findUnique({ where: { email: identifier } });
+    }
 
     if (!user || user.role !== Role.PATIENT) throw AppError.unauthorized('Invalid credentials');
     if (user.isBlocked) throw AppError.forbidden('Account is blocked');

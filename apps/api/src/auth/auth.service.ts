@@ -415,9 +415,11 @@ export class AuthService {
         name: 'Apollo Heart Clinic',
         addressLine1: '123 MG Road, Andheri West',
         city: 'Mumbai',
+        state: 'Maharashtra',
         phone: '+91-2226543210',
         lat: 19.1197,
         lng: 72.8467,
+        images: [],
         isActive: true,
       },
     });
@@ -428,9 +430,11 @@ export class AuthService {
         name: 'City Neuro Centre',
         addressLine1: '456 Brigade Road, Indiranagar',
         city: 'Bangalore',
+        state: 'Karnataka',
         phone: '+91-8026543210',
         lat: 12.9719,
         lng: 77.6412,
+        images: [],
         isActive: true,
       },
     });

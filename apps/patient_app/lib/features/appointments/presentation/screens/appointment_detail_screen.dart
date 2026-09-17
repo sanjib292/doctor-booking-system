@@ -20,21 +20,31 @@ class AppointmentDetailScreen extends ConsumerStatefulWidget {
 class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScreen> {
   bool _cancelling = false;
 
-  Map<String, dynamic>? get _appt => widget.appointmentData;
-
   @override
   Widget build(BuildContext context) {
-    if (_appt == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Appointment Details')),
-        body: const Center(child: Text('Appointment data not available.')),
-      );
+    if (widget.appointmentData != null) {
+      return _buildScaffold(context, widget.appointmentData!);
     }
 
+    final fetched = ref.watch(appointmentByIdProvider(widget.appointmentId));
+    return fetched.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Appointment Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(title: const Text('Appointment Details')),
+        body: Center(child: Text('Failed to load appointment\n$e')),
+      ),
+      data: (appt) => _buildScaffold(context, appt),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, Map<String, dynamic> appt) {
     final theme = Theme.of(context);
-    final status = _appt!['status'] as String? ?? '';
-    final doctor = _appt!['doctor'] as Map? ?? {};
-    final clinic = _appt!['clinic'] as Map? ?? {};
+    final status = appt['status'] as String? ?? '';
+    final doctor = appt['doctor'] as Map? ?? {};
+    final clinic = appt['clinic'] as Map? ?? {};
     final canCancel = ['PENDING', 'CONFIRMED'].contains(status);
 
     return Scaffold(
@@ -86,13 +96,13 @@ class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScree
                   _DetailRow(
                     icon: Icons.calendar_today_outlined,
                     label: 'Date',
-                    value: _appt!['date'] as String? ?? '',
+                    value: appt['date'] as String? ?? '',
                   ),
                   const Divider(height: 20),
                   _DetailRow(
                     icon: Icons.access_time_rounded,
                     label: 'Time',
-                    value: '${_appt!['startTime'] ?? ''} – ${_appt!['endTime'] ?? ''}',
+                    value: '${appt['startTime'] ?? ''} – ${appt['endTime'] ?? ''}',
                   ),
                 ],
               ),
@@ -109,13 +119,13 @@ class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScree
                 ),
               ),
 
-            if ((_appt!['notes'] as String?)?.isNotEmpty == true) ...[
+            if ((appt['notes'] as String?)?.isNotEmpty == true) ...[
               const SizedBox(height: 12),
               _SectionCard(
                 child: _DetailRow(
                   icon: Icons.notes_rounded,
                   label: 'Notes',
-                  value: _appt!['notes'] as String,
+                  value: appt['notes'] as String,
                 ),
               ),
             ],

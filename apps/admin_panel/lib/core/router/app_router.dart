@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
@@ -12,6 +13,14 @@ import '../widgets/admin_shell.dart';
 final routerProvider = Provider<GoRouter>((_) {
   return GoRouter(
     initialLocation: '/login',
+    redirect: (_, state) async {
+      const storage = FlutterSecureStorage();
+      final token = await storage.read(key: 'access_token');
+      final onLogin = state.matchedLocation == '/login';
+      if (token == null && !onLogin) return '/login';
+      if (token != null && onLogin) return '/dashboard';
+      return null;
+    },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       ShellRoute(

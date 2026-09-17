@@ -23,7 +23,7 @@ export class AdminService {
       prisma.appointment.count(),
       prisma.clinic.count({ where: { isActive: true } }),
       prisma.appointment.count({ where: { date: { gte: this.startOfDay(), lte: this.endOfDay() } } }),
-      prisma.doctor.count({ where: { verificationStatus: VerificationStatus.PENDING } }),
+      prisma.doctor.count({ where: { verificationStatus: VerificationStatus.PENDING, deletedAt: null } }),
       prisma.appointment.groupBy({ by: ['status'], _count: true }),
       prisma.appointment.findMany({
         take: 5,
@@ -182,7 +182,8 @@ export class AdminService {
       },
     });
 
-    return updated;
+    const { passwordHash: _ph, ...safe } = updated as any;
+    return safe;
   }
 
   // ─── Clinic Management ──────────────────────────────────────────────────
@@ -249,7 +250,7 @@ export class AdminService {
     });
 
     const agg = await prisma.review.aggregate({
-      where: { doctorId: review.doctorId, isVisible: true },
+      where: { doctorId: review.doctorId, isVisible: true, deletedAt: null },
       _avg: { rating: true },
       _count: true,
     });

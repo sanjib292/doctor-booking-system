@@ -18,6 +18,9 @@ router.post('/:id/reschedule', authenticate, authorize('PATIENT'), controller.re
 router.get('/doctor/list', authenticate, authorize('DOCTOR'), controller.getDoctorAppointments);
 router.patch('/:id/status', authenticate, authorize('DOCTOR'), controller.updateAppointmentStatus);
 
+// Single appointment lookup (patient sees own, doctor sees own, admin sees any)
+router.get('/:id', authenticate, authorize('PATIENT', 'DOCTOR', 'ADMIN'), controller.getAppointmentById);
+
 // Cancel (patient or doctor)
 router.post('/:id/cancel', authenticate, authorize('PATIENT', 'DOCTOR', 'ADMIN'), controller.cancelAppointment);
 

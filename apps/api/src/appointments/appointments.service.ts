@@ -72,16 +72,12 @@ export class AppointmentsService {
   }
 
   async lockSlot(slotId: string, userId: string): Promise<void> {
-    const slot = await prisma.timeSlot.findUnique({ where: { id: slotId } });
-    if (!slot) throw AppError.notFound('Slot');
-    if (slot.status !== SlotStatus.AVAILABLE) throw AppError.conflict('Slot is no longer available');
-
     const lockExpiresAt = new Date(Date.now() + env.SLOT_LOCK_TTL * 1000);
-
-    await prisma.timeSlot.update({
+    const result = await prisma.timeSlot.updateMany({
       where: { id: slotId, status: SlotStatus.AVAILABLE },
       data: { status: SlotStatus.LOCKED, lockedAt: new Date(), lockedBy: userId, lockExpiresAt },
     });
+    if (result.count === 0) throw AppError.conflict('Slot is no longer available');
   }
 
   async releaseSlotLock(slotId: string, userId: string): Promise<void> {
@@ -119,11 +115,15 @@ export class AppointmentsService {
         throw AppError.conflict('Slot is no longer available');
       }
 
-      // Update slot to BOOKED
-      await tx.timeSlot.update({
-        where: { id: slotId },
+      // Update slot to BOOKED — include status guard to prevent double-booking under concurrent requests
+      const booked = await tx.timeSlot.updateMany({
+        where: {
+          id: slotId,
+          status: { in: [SlotStatus.AVAILABLE, SlotStatus.LOCKED] },
+        },
         data: { status: SlotStatus.BOOKED, bookedAt: new Date(), lockedBy: null, lockExpiresAt: null },
       });
+      if (booked.count === 0) throw AppError.conflict('Slot was just taken. Please choose another.');
 
       // Create appointment
       const appointment = await tx.appointment.create({
@@ -293,6 +293,16 @@ export class AppointmentsService {
     doctorId: string,
     newStatus: AppointmentStatus,
   ) {
+    const allowed: AppointmentStatus[] = [
+      AppointmentStatus.CHECKED_IN,
+      AppointmentStatus.IN_CONSULTATION,
+      AppointmentStatus.COMPLETED,
+      AppointmentStatus.NO_SHOW,
+    ];
+    if (!allowed.includes(newStatus)) {
+      throw AppError.badRequest(`Doctors can only set status to: ${allowed.join(', ')}`);
+    }
+
     const appointment = await prisma.appointment.findFirst({
       where: { id: appointmentId, doctorId },
     });
@@ -317,6 +327,23 @@ export class AppointmentsService {
     });
   }
 
+  async getAppointmentById(appointmentId: string, requesterId: string, role: string) {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        doctor: { select: { id: true, name: true, avatarUrl: true, phone: true } },
+        clinic: { select: { id: true, name: true, addressLine1: true, city: true } },
+        patient: { select: { id: true, name: true, phone: true } },
+      },
+    });
+    if (!appointment) throw AppError.notFound('Appointment');
+
+    if (role === 'PATIENT' && appointment.patientId !== requesterId) throw AppError.forbidden();
+    if (role === 'DOCTOR' && appointment.doctorId !== requesterId) throw AppError.forbidden();
+
+    return appointment;
+  }
+
   // ─── Helpers ────────────────────────────────────────────────────────────
 
   private generateSlots(
@@ -334,7 +361,7 @@ export class AppointmentsService {
 
     while (current + durationMinutes <= end) {
       const slotEnd = current + durationMinutes;
-      const inBreak = breakS !== null && breakE !== null && current >= breakS && slotEnd <= breakE;
+      const inBreak = breakS !== null && breakE !== null && current < breakE && slotEnd > breakS;
 
       if (!inBreak) {
         slots.push({

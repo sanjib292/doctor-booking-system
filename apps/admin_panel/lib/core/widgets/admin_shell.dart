@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 
 class AdminShell extends StatelessWidget {
@@ -41,6 +42,16 @@ class AdminShell extends StatelessWidget {
                     icon: Icon(item.icon),
                     label: Text(item.label),
                   ),
+                ),
+                const Divider(indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.logout_rounded, color: Colors.red),
+                  title: const Text('Logout', style: TextStyle(color: Colors.red)),
+                  onTap: () async {
+                    const storage = FlutterSecureStorage();
+                    await storage.deleteAll();
+                    if (context.mounted) context.go('/login');
+                  },
                 ),
               ],
             ),

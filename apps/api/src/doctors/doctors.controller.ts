@@ -39,7 +39,8 @@ export const getDoctorProfile = asyncHandler(async (req: Request, res: Response)
 });
 
 export const updateDoctorProfile = asyncHandler(async (req: Request, res: Response) => {
-  const updated = await service.updateDoctorProfile(req.user!.id, req.body);
+  const { about, languages, avatarUrl, fcmToken, phone } = req.body;
+  const updated = await service.updateDoctorProfile(req.user!.id, { about, languages, avatarUrl, fcmToken, phone });
   sendSuccess(res, updated, 'Profile updated');
 });
 

@@ -42,7 +42,9 @@ class AuthService {
     String? gender,
     int? age,
   }) async {
-    final response = await _dio.post('/auth/patient/register', data: {
+    // Backend creates the user and sends OTP — returns { expiresIn }
+    // Caller should navigate to OTP screen; tokens are issued after OTP verify.
+    await _dio.post('/auth/patient/register', data: {
       'name': name,
       'email': email,
       'phone': phone,
@@ -50,13 +52,6 @@ class AuthService {
       if (gender != null) 'gender': gender,
       if (age != null) 'age': age,
     });
-
-    final data = response.data['data'] as Map<String, dynamic>;
-    await _storage.saveTokens(
-      accessToken: data['accessToken'] as String,
-      refreshToken: data['refreshToken'] as String,
-    );
-    await _storage.saveUser(data['user'] as Map<String, dynamic>);
   }
 
   Future<void> completeRegistration({

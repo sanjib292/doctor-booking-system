@@ -79,3 +79,8 @@ export const updateAppointmentStatus = asyncHandler(async (req: Request, res: Re
   );
   sendSuccess(res, updated, 'Status updated');
 });
+
+export const getAppointmentById = asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.getAppointmentById(req.params.id, req.user!.id, req.user!.role);
+  sendSuccess(res, result);
+});

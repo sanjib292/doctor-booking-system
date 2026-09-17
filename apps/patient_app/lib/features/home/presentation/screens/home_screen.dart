@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/doctor_card.dart';
 import '../../../../core/widgets/skeleton_loader.dart';
+import '../../../appointments/presentation/providers/appointments_provider.dart';
 import '../../../doctors/presentation/providers/doctors_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -19,11 +20,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final nearbyDoctors = ref.watch(nearbyDoctorsProvider);
+    final upcomingAppt = ref.watch(upcomingAppointmentProvider);
 
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref.refresh(nearbyDoctorsProvider.future),
+          onRefresh: () async {
+            ref.invalidate(nearbyDoctorsProvider);
+            ref.invalidate(upcomingAppointmentProvider);
+          },
           child: CustomScrollView(
             slivers: [
               // Header
@@ -121,6 +126,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SizedBox(height: 24),
                     ],
                   ),
+                ),
+              ),
+
+              // Upcoming appointment card
+              SliverToBoxAdapter(
+                child: upcomingAppt.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (appt) {
+                    if (appt == null) return const SizedBox.shrink();
+                    final doctor = appt['doctor'] as Map? ?? {};
+                    final date = (appt['date'] as String? ?? '').length >= 10
+                        ? (appt['date'] as String).substring(0, 10)
+                        : appt['date'] as String? ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      child: GestureDetector(
+                        onTap: () => context.pushNamed(
+                          'appointmentDetail',
+                          pathParameters: {'id': appt['id'] as String},
+                          extra: appt,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.primary, AppColors.primaryLight],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Upcoming Appointment',
+                                      style: AppTextStyles.labelSmall
+                                          .copyWith(color: Colors.white70),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Dr. ${doctor['name'] ?? ''}',
+                                      style: AppTextStyles.titleMedium
+                                          .copyWith(color: Colors.white),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '$date  ·  ${appt['startTime'] ?? ''}',
+                                      style: AppTextStyles.bodySmall
+                                          .copyWith(color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: Colors.white70, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
 

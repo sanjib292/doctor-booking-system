@@ -53,48 +53,51 @@ function buildConditions(where, params, tableAlias) {
     } else if (val === undefined) {
       // skip
     } else if (typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
-      // Nested condition object
+      // Nested condition object — each branch owns its own nextParam/push
       const subClauses = [];
       for (const [op, opVal] of Object.entries(val)) {
-        if (opVal === undefined) continue;
-        const p = nextParam();
-        params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
-        if (op === 'equals') subClauses.push(`${prefix}${col(key)} = ${p}`);
-        else if (op === 'not') {
-          if (opVal === null) subClauses.push(`${prefix}${col(key)} IS NOT NULL`);
-          else subClauses.push(`${prefix}${col(key)} != ${p}`);
-        }
-        else if (op === 'in') {
-          params.pop();
+        if (opVal === undefined || op === 'mode') continue;
+        if (op === 'equals') {
+          const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+          subClauses.push(`${prefix}${col(key)} = ${p}`);
+        } else if (op === 'not') {
+          if (opVal === null) {
+            subClauses.push(`${prefix}${col(key)} IS NOT NULL`);
+          } else {
+            const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+            subClauses.push(`${prefix}${col(key)} != ${p}`);
+          }
+        } else if (op === 'in') {
           const placeholders = opVal.map(v => { const pp = nextParam(); params.push(v); return pp; });
           subClauses.push(`${prefix}${col(key)} IN (${placeholders.join(', ')})`);
-        }
-        else if (op === 'notIn') {
-          params.pop();
+        } else if (op === 'notIn') {
           const placeholders = opVal.map(v => { const pp = nextParam(); params.push(v); return pp; });
           subClauses.push(`${prefix}${col(key)} NOT IN (${placeholders.join(', ')})`);
+        } else if (op === 'lt') {
+          const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+          subClauses.push(`${prefix}${col(key)} < ${p}`);
+        } else if (op === 'lte') {
+          const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+          subClauses.push(`${prefix}${col(key)} <= ${p}`);
+        } else if (op === 'gt') {
+          const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+          subClauses.push(`${prefix}${col(key)} > ${p}`);
+        } else if (op === 'gte') {
+          const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+          subClauses.push(`${prefix}${col(key)} >= ${p}`);
+        } else if (op === 'contains') {
+          const p = nextParam(); params.push(`%${opVal}%`);
+          subClauses.push(`${prefix}${col(key)} ILIKE ${p}`);
+        } else if (op === 'startsWith') {
+          const p = nextParam(); params.push(`${opVal}%`);
+          subClauses.push(`${prefix}${col(key)} ILIKE ${p}`);
+        } else if (op === 'endsWith') {
+          const p = nextParam(); params.push(`%${opVal}`);
+          subClauses.push(`${prefix}${col(key)} ILIKE ${p}`);
+        } else {
+          const p = nextParam(); params.push(opVal instanceof Date ? opVal.toISOString() : opVal);
+          subClauses.push(`${prefix}${col(key)} = ${p}`);
         }
-        else if (op === 'lt') subClauses.push(`${prefix}${col(key)} < ${p}`);
-        else if (op === 'lte') subClauses.push(`${prefix}${col(key)} <= ${p}`);
-        else if (op === 'gt') subClauses.push(`${prefix}${col(key)} > ${p}`);
-        else if (op === 'gte') subClauses.push(`${prefix}${col(key)} >= ${p}`);
-        else if (op === 'contains') {
-          params.pop();
-          const pp = nextParam(); params.push(`%${opVal}%`);
-          subClauses.push(`${prefix}${col(key)} ILIKE ${pp}`);
-        }
-        else if (op === 'startsWith') {
-          params.pop();
-          const pp = nextParam(); params.push(`${opVal}%`);
-          subClauses.push(`${prefix}${col(key)} ILIKE ${pp}`);
-        }
-        else if (op === 'endsWith') {
-          params.pop();
-          const pp = nextParam(); params.push(`%${opVal}`);
-          subClauses.push(`${prefix}${col(key)} ILIKE ${pp}`);
-        }
-        else if (op === 'mode') params.pop(); // ignore
-        else subClauses.push(`${prefix}${col(key)} = ${p}`);
       }
       if (subClauses.length > 0) clauses.push(subClauses.join(' AND '));
     } else {

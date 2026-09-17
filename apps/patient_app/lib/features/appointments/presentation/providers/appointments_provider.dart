@@ -61,6 +61,11 @@ class AppointmentService {
   Future<void> cancelAppointment(String appointmentId, String reason) async {
     await _dio.post('/appointments/$appointmentId/cancel', data: {'reason': reason});
   }
+
+  Future<Map<String, dynamic>> getAppointmentById(String id) async {
+    final response = await _dio.get('/appointments/$id');
+    return response.data['data'] as Map<String, dynamic>;
+  }
 }
 
 final appointmentServiceProvider = Provider<AppointmentService>(
@@ -73,4 +78,17 @@ final patientAppointmentsProvider = FutureProvider.autoDispose.family<List<Map<S
     final result = await service.getAppointments(status: status);
     return List<Map<String, dynamic>>.from((result['data'] as List?) ?? []);
   },
+);
+
+final upcomingAppointmentProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+  final service = ref.watch(appointmentServiceProvider);
+  final result = await service.getAppointments(status: 'CONFIRMED', limit: 1);
+  final list = List<Map<String, dynamic>>.from((result['data'] as List?) ?? []);
+  return list.isNotEmpty ? list.first : null;
+});
+
+final appointmentByIdProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>, String>(
+  (ref, id) async => ref.watch(appointmentServiceProvider).getAppointmentById(id),
 );

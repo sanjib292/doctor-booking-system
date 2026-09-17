@@ -7,11 +7,13 @@ const router = Router();
 // Public routes
 router.get('/categories', controller.getCategories);
 router.get('/', optionalAuth, controller.searchDoctors);
-router.get('/:id/availability', controller.getDoctorAvailability);  // Phase 2
-router.get('/:id', optionalAuth, controller.getDoctorById);
 
-// Doctor-only routes
+// Doctor-only routes (must be before /:id to avoid Express matching 'me' as an id)
 router.get('/me/profile', authenticate, authorize('DOCTOR'), controller.getDoctorProfile);
 router.patch('/me/profile', authenticate, authorize('DOCTOR'), controller.updateDoctorProfile);
+
+// Parameterised public routes
+router.get('/:id/availability', controller.getDoctorAvailability);
+router.get('/:id', optionalAuth, controller.getDoctorById);
 
 export default router;

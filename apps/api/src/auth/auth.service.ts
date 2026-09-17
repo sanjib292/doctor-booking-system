@@ -19,16 +19,17 @@ export class AuthService {
     gender?: string,
     age?: number,
     fcmToken?: string,
-  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
-    const existing = await prisma.user.findFirst({
-      where: { OR: [{ phone }, { email }] },
-    });
-    if (existing?.phone === phone) throw AppError.conflict('Phone number is already registered');
-    if (existing?.email === email) throw AppError.conflict('Email is already registered');
+  ): Promise<{ expiresIn: number }> {
+    const [byPhone, byEmail] = await Promise.all([
+      prisma.user.findUnique({ where: { phone } }),
+      prisma.user.findUnique({ where: { email } }),
+    ]);
+    if (byPhone) throw AppError.conflict('Phone number is already registered');
+    if (byEmail) throw AppError.conflict('Email is already registered');
 
     const passwordHash = await hashPassword(password);
 
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         phone,
         email,
@@ -41,14 +42,8 @@ export class AuthService {
       },
     });
 
-    const tokens = generateTokenPair({ id: user.id, role: user.role, phone: user.phone });
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await prisma.refreshToken.create({
-      data: { token: tokens.refreshToken, userId: user.id, expiresAt },
-    });
-
-    const { passwordHash: _ph, ...safeUser } = user as any;
-    return { ...tokens, user: safeUser };
+    // Send OTP so the patient verifies their phone before getting tokens
+    return this.sendOtp(phone);
   }
 
   async sendOtp(phone: string): Promise<{ expiresIn: number }> {
@@ -63,9 +58,7 @@ export class AuthService {
       data: { isUsed: true },
     });
 
-    // Development mode: OTP is always 123456 for easy testing
-    // In production: replace with real SMS provider (MSG91, Twilio, etc.)
-    const code = '123456';
+    const code = env.NODE_ENV !== 'production' ? '123456' : generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await prisma.otpCode.create({
@@ -132,7 +125,7 @@ export class AuthService {
       data: { token: tokens.refreshToken, userId: user.id, expiresAt },
     });
 
-    const { ...safeUser } = user;
+    const { passwordHash: _ph, ...safeUser } = user as any;
     return { ...tokens, user: safeUser, isNewUser };
   }
 

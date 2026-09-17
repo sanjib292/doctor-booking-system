@@ -83,34 +83,47 @@ const reminder1hJob = new CronJob('*/15 * * * *', async () => {
     const oneHourFifteenLater = new Date(Date.now() + 75 * 60 * 1000);
 
     const targetDate = startOfDay(oneHourLater);
-    const timeStr = oneHourLater.toTimeString().slice(0, 5);
+    const fromTime = oneHourLater.toTimeString().slice(0, 5);
+    const toTime = oneHourFifteenLater.toTimeString().slice(0, 5);
 
     const appointments = await prisma.appointment.findMany({
       where: {
         date: targetDate,
-        startTime: timeStr,
+        startTime: { gte: fromTime, lte: toTime },
         status: AppointmentStatus.CONFIRMED,
         isPatientReminded1h: false,
       },
       include: {
-        patient: { select: { fcmToken: true } },
+        patient: { select: { fcmToken: true, id: true } },
         doctor: { select: { name: true } },
       },
     });
 
     for (const appt of appointments) {
       if (appt.patient.fcmToken) {
-        await sendPushNotification(
+        const sent = await sendPushNotification(
           appt.patient.fcmToken,
           'Appointment in 1 Hour',
           `Your appointment with Dr. ${appt.doctor.name} starts at ${appt.startTime}`,
           { appointmentId: appt.id, type: NotificationType.BOOKING_REMINDER_1H },
         );
 
-        await prisma.appointment.update({
-          where: { id: appt.id },
-          data: { isPatientReminded1h: true },
-        });
+        if (sent) {
+          await prisma.appointment.update({
+            where: { id: appt.id },
+            data: { isPatientReminded1h: true },
+          });
+
+          await prisma.notification.create({
+            data: {
+              userId: appt.patient.id,
+              type: NotificationType.BOOKING_REMINDER_1H,
+              title: 'Appointment in 1 Hour',
+              body: `Your appointment with Dr. ${appt.doctor.name} starts at ${appt.startTime}`,
+              data: { appointmentId: appt.id },
+            },
+          });
+        }
       }
     }
   } catch (err) {
@@ -135,7 +148,7 @@ const cleanTokensJob = new CronJob('0 2 * * *', async () => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const { count } = await prisma.refreshToken.deleteMany({
-      where: { OR: [{ isRevoked: true }, { expiresAt: { lt: thirtyDaysAgo } }] },
+      where: { isRevoked: true, expiresAt: { lt: new Date() } },
     });
     logger.info(`Cleaned ${count} expired refresh tokens`);
   } catch (err) {

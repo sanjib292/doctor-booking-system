@@ -62,16 +62,19 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     });
 
     try {
+      final phone = '+91${_phoneController.text.trim()}';
       await ref.read(authServiceProvider).registerPatient(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
-        phone: '+91${_phoneController.text.trim()}',
+        phone: phone,
         password: _passwordController.text,
         gender: _gender,
         age: int.tryParse(_ageController.text),
       );
 
-      if (mounted) context.goNamed('home');
+      if (mounted) {
+        context.goNamed('otpVerification', extra: phone);
+      }
     } on DioException catch (e) {
       if (mounted) {
         final data = e.response?.data;

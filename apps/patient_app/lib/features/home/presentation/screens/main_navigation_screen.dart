@@ -8,8 +8,6 @@ import '../../../doctors/presentation/screens/doctor_search_screen.dart';
 import '../../../appointments/presentation/screens/appointments_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 
-final _navIndexProvider = StateProvider<int>((ref) => 0);
-
 class MainNavigationScreen extends ConsumerWidget {
   const MainNavigationScreen({super.key, required this.child});
   final Widget child;
@@ -21,9 +19,17 @@ class MainNavigationScreen extends ConsumerWidget {
     _NavTab(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile', route: '/profile'),
   ];
 
+  int _indexFor(String location) {
+    for (var i = 0; i < _tabs.length; i++) {
+      if (location.startsWith(_tabs[i].route)) return i;
+    }
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentIndex = ref.watch(_navIndexProvider);
+    final location = GoRouterState.of(context).matchedLocation;
+    final currentIndex = _indexFor(location);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -56,7 +62,7 @@ class MainNavigationScreen extends ConsumerWidget {
                 final selected = currentIndex == i;
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () => ref.read(_navIndexProvider.notifier).state = i,
+                    onTap: () => context.go(tab.route),
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),

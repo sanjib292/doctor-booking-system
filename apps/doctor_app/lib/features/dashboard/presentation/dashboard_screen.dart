@@ -10,7 +10,9 @@ final _dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(baseUrl: _baseUrl));
   dio.interceptors.add(InterceptorsWrapper(
     onRequest: (opts, handler) async {
-      const storage = FlutterSecureStorage();
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      );
       final token = await storage.read(key: 'access_token');
       if (token != null) opts.headers['Authorization'] = 'Bearer $token';
       handler.next(opts);

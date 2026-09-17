@@ -396,34 +396,39 @@ class _PromoBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Book Your First\nAppointment',
-                  style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Book Your First Appointment',
+                    style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
+                    maxLines: 2,
                   ),
-                  child: Text(
-                    'Find Doctors Near You',
-                    style: AppTextStyles.labelSmall.copyWith(color: Colors.white),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Find Doctors Near You',
+                      style: AppTextStyles.labelSmall.copyWith(color: Colors.white),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 52),
-        ],
+            const SizedBox(width: 12),
+            const Icon(Icons.local_hospital_rounded, color: Colors.white70, size: 48),
+          ],
+        ),
       ),
     );
   }

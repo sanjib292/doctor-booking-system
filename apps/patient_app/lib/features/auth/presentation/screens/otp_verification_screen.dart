@@ -19,7 +19,7 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
-  final _otpController = TextEditingController();
+  String _otp = '';
   bool _isLoading = false;
   int _resendSeconds = 60;
   Timer? _timer;
@@ -34,14 +34,18 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    _otpController.dispose();
     super.dispose();
   }
 
   void _startResendTimer() {
+    if (!mounted) return;
     setState(() => _resendSeconds = 60);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       if (_resendSeconds <= 0) {
         t.cancel();
       } else {
@@ -52,6 +56,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
   Future<void> _verifyOtp(String otp) async {
     if (otp.length != 6) return;
+    if (!mounted) return;
     setState(() { _isLoading = true; _error = null; });
 
     try {
@@ -70,6 +75,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         context.goNamed('home');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -113,7 +119,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       text: widget.phone,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -125,7 +131,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               PinCodeTextField(
                 appContext: context,
                 length: 6,
-                controller: _otpController,
                 animationType: AnimationType.fade,
                 keyboardType: TextInputType.number,
                 pinTheme: PinTheme(
@@ -135,14 +140,20 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                   fieldWidth: 46,
                   activeFillColor: theme.colorScheme.surfaceContainerHighest,
                   inactiveFillColor: theme.colorScheme.surfaceContainerHighest,
-                  selectedFillColor: AppColors.primaryContainer,
+                  selectedFillColor: theme.colorScheme.primaryContainer,
                   activeColor: AppColors.primary,
                   inactiveColor: Colors.transparent,
                   selectedColor: AppColors.primary,
                 ),
                 enableActiveFill: true,
-                onCompleted: _verifyOtp,
-                onChanged: (_) => setState(() => _error = null),
+                onChanged: (v) {
+                  if (!mounted) return;
+                  setState(() { _otp = v; _error = null; });
+                },
+                onCompleted: (v) {
+                  if (!mounted) return;
+                  _verifyOtp(v);
+                },
               ),
 
               if (_error != null) ...[
@@ -157,7 +168,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
               AppButton(
                 label: 'Verify OTP',
-                onPressed: () => _verifyOtp(_otpController.text),
+                onPressed: () => _verifyOtp(_otp),
                 isLoading: _isLoading,
               ),
 

@@ -322,28 +322,29 @@ export class AuthService {
 
   // ─── Seed / reset known accounts ──────────────────────────────────
   async initSeed(): Promise<object> {
-    const [adminHash, doctorHash, doctor2Hash] = await Promise.all([
+    const [adminHash, doctorHash] = await Promise.all([
       hashPassword('Admin@123456'),
-      hashPassword('Doctor@123456'),
       hashPassword('Doctor@123456'),
     ]);
 
+    // ── Admin ────────────────────────────────────────────────────────
     const admin = await prisma.admin.upsert({
       where: { email: 'admin@doctorbooking.com' },
       update: { passwordHash: adminHash, name: 'Super Admin' },
       create: { email: 'admin@doctorbooking.com', passwordHash: adminHash, name: 'Super Admin', role: 'SUPER_ADMIN' as any },
     });
 
+    // ── Doctors ──────────────────────────────────────────────────────
     const doctor1 = await prisma.doctor.upsert({
       where: { email: 'dr.sharma@doctorbooking.com' },
       update: { passwordHash: doctorHash, isActive: true, verificationStatus: 'VERIFIED' as any },
       create: {
         email: 'dr.sharma@doctorbooking.com',
         passwordHash: doctorHash,
-        name: 'Dr. Rajesh Sharma',
+        name: 'Rajesh Sharma',
         phone: '+91-9876543211',
         gender: 'MALE' as any,
-        about: 'Senior Cardiologist with 15+ years experience.',
+        about: 'Senior Cardiologist with 15+ years of experience in interventional cardiology.',
         qualifications: ['MBBS', 'MD (Cardiology)', 'DM (Cardiology)'],
         experienceYears: 15,
         languages: ['English', 'Hindi'],
@@ -357,14 +358,14 @@ export class AuthService {
 
     const doctor2 = await prisma.doctor.upsert({
       where: { email: 'dr.priya@doctorbooking.com' },
-      update: { passwordHash: doctor2Hash, isActive: true, verificationStatus: 'VERIFIED' as any },
+      update: { passwordHash: doctorHash, isActive: true, verificationStatus: 'VERIFIED' as any },
       create: {
         email: 'dr.priya@doctorbooking.com',
-        passwordHash: doctor2Hash,
-        name: 'Dr. Priya Nair',
+        passwordHash: doctorHash,
+        name: 'Priya Nair',
         phone: '+91-9876543212',
         gender: 'FEMALE' as any,
-        about: 'Specialist in Neurology with focus on movement disorders.',
+        about: 'Specialist in Neurology with focus on movement disorders and epilepsy.',
         qualifications: ['MBBS', 'MD (Neurology)', 'DM (Neurology)'],
         experienceYears: 12,
         languages: ['English', 'Hindi', 'Malayalam'],
@@ -376,9 +377,105 @@ export class AuthService {
       },
     });
 
+    // ── Categories ───────────────────────────────────────────────────
+    let cardioCat = await prisma.category.findFirst({ where: { name: 'Cardiology' } });
+    if (!cardioCat) cardioCat = await prisma.category.create({
+      data: { name: 'Cardiology', slug: 'cardiology', color: '#FF5252', isActive: true, sortOrder: 1 },
+    });
+
+    let neuroCat = await prisma.category.findFirst({ where: { name: 'Neurology' } });
+    if (!neuroCat) neuroCat = await prisma.category.create({
+      data: { name: 'Neurology', slug: 'neurology', color: '#448AFF', isActive: true, sortOrder: 2 },
+    });
+
+    let generalCat = await prisma.category.findFirst({ where: { name: 'General Physician' } });
+    if (!generalCat) generalCat = await prisma.category.create({
+      data: { name: 'General Physician', slug: 'general-physician', color: '#4CAF50', isActive: true, sortOrder: 3 },
+    });
+
+    let dermCat = await prisma.category.findFirst({ where: { name: 'Dermatology' } });
+    if (!dermCat) dermCat = await prisma.category.create({
+      data: { name: 'Dermatology', slug: 'dermatology', color: '#FF9800', isActive: true, sortOrder: 4 },
+    });
+
+    let orthoCat = await prisma.category.findFirst({ where: { name: 'Orthopedics' } });
+    if (!orthoCat) orthoCat = await prisma.category.create({
+      data: { name: 'Orthopedics', slug: 'orthopedics', color: '#9C27B0', isActive: true, sortOrder: 5 },
+    });
+
+    let pediatCat = await prisma.category.findFirst({ where: { name: 'Pediatrics' } });
+    if (!pediatCat) pediatCat = await prisma.category.create({
+      data: { name: 'Pediatrics', slug: 'pediatrics', color: '#00BCD4', isActive: true, sortOrder: 6 },
+    });
+
+    // ── Clinics ──────────────────────────────────────────────────────
+    let clinic1 = await prisma.clinic.findFirst({ where: { name: 'Apollo Heart Clinic' } });
+    if (!clinic1) clinic1 = await prisma.clinic.create({
+      data: {
+        name: 'Apollo Heart Clinic',
+        addressLine1: '123 MG Road, Andheri West',
+        city: 'Mumbai',
+        phone: '+91-2226543210',
+        lat: 19.1197,
+        lng: 72.8467,
+        isActive: true,
+      },
+    });
+
+    let clinic2 = await prisma.clinic.findFirst({ where: { name: 'City Neuro Centre' } });
+    if (!clinic2) clinic2 = await prisma.clinic.create({
+      data: {
+        name: 'City Neuro Centre',
+        addressLine1: '456 Brigade Road, Indiranagar',
+        city: 'Bangalore',
+        phone: '+91-8026543210',
+        lat: 12.9719,
+        lng: 77.6412,
+        isActive: true,
+      },
+    });
+
+    // ── Doctor-Clinic Associations ────────────────────────────────────
+    const dc1 = await prisma.doctorClinic.findFirst({ where: { doctorId: (doctor1 as any).id, clinicId: (clinic1 as any).id } });
+    if (!dc1) await prisma.doctorClinic.create({
+      data: { doctorId: (doctor1 as any).id, clinicId: (clinic1 as any).id, isPrimary: true, consultationFee: 800, isActive: true },
+    });
+
+    const dc2 = await prisma.doctorClinic.findFirst({ where: { doctorId: (doctor2 as any).id, clinicId: (clinic2 as any).id } });
+    if (!dc2) await prisma.doctorClinic.create({
+      data: { doctorId: (doctor2 as any).id, clinicId: (clinic2 as any).id, isPrimary: true, consultationFee: 700, isActive: true },
+    });
+
+    // ── Doctor-Category Associations ──────────────────────────────────
+    const dcat1 = await prisma.doctorCategory.findFirst({ where: { doctorId: (doctor1 as any).id, categoryId: (cardioCat as any).id } });
+    if (!dcat1) await prisma.doctorCategory.create({
+      data: { doctorId: (doctor1 as any).id, categoryId: (cardioCat as any).id, isPrimary: true },
+    });
+
+    const dcat2 = await prisma.doctorCategory.findFirst({ where: { doctorId: (doctor2 as any).id, categoryId: (neuroCat as any).id } });
+    if (!dcat2) await prisma.doctorCategory.create({
+      data: { doctorId: (doctor2 as any).id, categoryId: (neuroCat as any).id, isPrimary: true },
+    });
+
+    // ── Doctor Availability (Mon-Sat for both doctors) ────────────────
+    const weekdays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as const;
+    for (const day of weekdays) {
+      const av1 = await prisma.doctorAvailability.findFirst({ where: { doctorId: (doctor1 as any).id, dayOfWeek: day as any } });
+      if (!av1) await prisma.doctorAvailability.create({
+        data: { doctorId: (doctor1 as any).id, dayOfWeek: day as any, startTime: '09:00', endTime: '17:00', slotDurationMinutes: 30, isActive: true },
+      });
+
+      const av2 = await prisma.doctorAvailability.findFirst({ where: { doctorId: (doctor2 as any).id, dayOfWeek: day as any } });
+      if (!av2) await prisma.doctorAvailability.create({
+        data: { doctorId: (doctor2 as any).id, dayOfWeek: day as any, startTime: '10:00', endTime: '18:00', slotDurationMinutes: 30, isActive: true },
+      });
+    }
+
     return {
-      admin: admin.email,
-      doctors: [doctor1.email, doctor2.email],
+      admin: (admin as any).email,
+      doctors: [(doctor1 as any).email, (doctor2 as any).email],
+      categories: ['Cardiology', 'Neurology', 'General Physician', 'Dermatology', 'Orthopedics', 'Pediatrics'],
+      clinics: [(clinic1 as any).name, (clinic2 as any).name],
       passwords: { admin: 'Admin@123456', doctors: 'Doctor@123456' },
     };
   }

@@ -112,7 +112,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Dr. ${doctor['name'] ?? ''}',
+                        'Dr. ${((doctor['name'] as String?) ?? '').replaceFirst(RegExp(r'^Dr\.?\s*', caseSensitive: false), '')}',
                         style: AppTextStyles.headlineSmall.copyWith(color: Colors.white),
                       ),
                       if (specialization.isNotEmpty) ...[
@@ -444,6 +444,32 @@ class _AvailabilityCalendar extends ConsumerWidget {
       ),
       error: (_, __) => const SizedBox.shrink(),
       data: (availableDays) {
+        if (availableDays.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.event_busy_outlined, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                const SizedBox(height: 12),
+                Text(
+                  'Schedule not yet configured',
+                  style: AppTextStyles.titleSmall.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Please contact the clinic directly to book an appointment.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          );
+        }
         return Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,

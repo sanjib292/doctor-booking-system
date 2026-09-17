@@ -102,6 +102,56 @@ router.delete('/categories/:id', asyncHandler(async (req: Request, res: Response
   sendSuccess(res, null, 'Category deleted');
 }));
 
+// Doctor availability management
+router.get('/doctors/:id/availability', asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getDoctorAvailability(req.params.id);
+  sendSuccess(res, data);
+}));
+
+router.post('/doctors/:id/availability', asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.setDoctorAvailability(req.params.id, req.body);
+  sendSuccess(res, data);
+}));
+
+router.delete('/doctors/:id/availability/:day', asyncHandler(async (req: Request, res: Response) => {
+  await service.deleteDoctorAvailabilityDay(req.params.id, req.params.day);
+  sendSuccess(res, null, 'Availability removed');
+}));
+
+// Doctor clinic assignment
+router.get('/doctors/:id/clinics', asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getDoctorClinics(req.params.id);
+  sendSuccess(res, data);
+}));
+
+router.post('/doctors/:id/clinics', asyncHandler(async (req: Request, res: Response) => {
+  const { clinicId, consultationFee, isPrimary } = req.body;
+  const data = await service.assignClinicToDoctor(req.params.id, clinicId, Number(consultationFee ?? 0), isPrimary ?? false);
+  sendCreated(res, data, 'Clinic assigned');
+}));
+
+router.delete('/doctors/:id/clinics/:clinicId', asyncHandler(async (req: Request, res: Response) => {
+  await service.removeClinicFromDoctor(req.params.id, req.params.clinicId);
+  sendSuccess(res, null, 'Clinic removed');
+}));
+
+// Doctor category assignment
+router.get('/doctors/:id/categories', asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getDoctorCategories(req.params.id);
+  sendSuccess(res, data);
+}));
+
+router.post('/doctors/:id/categories', asyncHandler(async (req: Request, res: Response) => {
+  const { categoryId, isPrimary } = req.body;
+  const data = await service.assignCategoryToDoctor(req.params.id, categoryId, isPrimary ?? false);
+  sendCreated(res, data, 'Category assigned');
+}));
+
+router.delete('/doctors/:id/categories/:categoryId', asyncHandler(async (req: Request, res: Response) => {
+  await service.removeCategoryFromDoctor(req.params.id, req.params.categoryId);
+  sendSuccess(res, null, 'Category removed');
+}));
+
 // Reviews moderation
 router.patch('/reviews/:id/moderate', asyncHandler(async (req: Request, res: Response) => {
   const review = await service.moderateReview(req.params.id, req.body.isVisible, req.user!.id);

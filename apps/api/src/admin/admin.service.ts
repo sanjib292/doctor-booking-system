@@ -274,6 +274,109 @@ export class AdminService {
     return prisma.category.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
   }
 
+  // ─── Doctor Availability ─────────────────────────────────────────────
+
+  async getDoctorAvailability(doctorId: string) {
+    return prisma.doctorAvailability.findMany({
+      where: { doctorId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+  }
+
+  async setDoctorAvailability(doctorId: string, data: {
+    dayOfWeek: string; startTime: string; endTime: string;
+    slotDurationMinutes: number; breakStart?: string; breakEnd?: string; isActive?: boolean;
+  }) {
+    const existing = await prisma.doctorAvailability.findFirst({
+      where: { doctorId, dayOfWeek: data.dayOfWeek as any },
+    });
+    if (existing) {
+      return prisma.doctorAvailability.update({
+        where: { id: (existing as any).id },
+        data: {
+          startTime: data.startTime,
+          endTime: data.endTime,
+          slotDurationMinutes: data.slotDurationMinutes,
+          breakStart: data.breakStart ?? null,
+          breakEnd: data.breakEnd ?? null,
+          isActive: data.isActive ?? true,
+        },
+      });
+    }
+    return prisma.doctorAvailability.create({
+      data: { doctorId, dayOfWeek: data.dayOfWeek as any, startTime: data.startTime, endTime: data.endTime, slotDurationMinutes: data.slotDurationMinutes, breakStart: data.breakStart, breakEnd: data.breakEnd, isActive: data.isActive ?? true },
+    });
+  }
+
+  async deleteDoctorAvailabilityDay(doctorId: string, dayOfWeek: string) {
+    const existing = await prisma.doctorAvailability.findFirst({ where: { doctorId, dayOfWeek: dayOfWeek as any } });
+    if (!existing) throw AppError.notFound('Availability');
+    return prisma.doctorAvailability.delete({ where: { id: (existing as any).id } });
+  }
+
+  // ─── Doctor Clinic Assignment ────────────────────────────────────────
+
+  async getDoctorClinics(doctorId: string) {
+    const rows = await prisma.$queryRaw(
+      `SELECT dc.*, c.name as "clinicName", c.city, c."addressLine1"
+       FROM doctor_clinics dc
+       JOIN clinics c ON c.id = dc."clinicId"
+       WHERE dc."doctorId" = $1`,
+      doctorId,
+    );
+    return rows;
+  }
+
+  async assignClinicToDoctor(doctorId: string, clinicId: string, consultationFee: number, isPrimary = false) {
+    const clinic = await prisma.clinic.findFirst({ where: { id: clinicId } });
+    if (!clinic) throw AppError.notFound('Clinic');
+    const existing = await prisma.doctorClinic.findFirst({ where: { doctorId, clinicId } });
+    if (existing) {
+      return prisma.doctorClinic.update({ where: { id: (existing as any).id }, data: { consultationFee, isPrimary, isActive: true } });
+    }
+    if (isPrimary) {
+      // Clear existing primary
+      const primaryRows = await prisma.doctorClinic.findMany({ where: { doctorId, isPrimary: true } });
+      for (const r of primaryRows as any[]) {
+        await prisma.doctorClinic.update({ where: { id: r.id }, data: { isPrimary: false } });
+      }
+    }
+    return prisma.doctorClinic.create({ data: { doctorId, clinicId, consultationFee, isPrimary, isActive: true } });
+  }
+
+  async removeClinicFromDoctor(doctorId: string, clinicId: string) {
+    const existing = await prisma.doctorClinic.findFirst({ where: { doctorId, clinicId } });
+    if (!existing) throw AppError.notFound('DoctorClinic');
+    return prisma.doctorClinic.delete({ where: { id: (existing as any).id } });
+  }
+
+  // ─── Doctor Category Assignment ──────────────────────────────────────
+
+  async getDoctorCategories(doctorId: string) {
+    const rows = await prisma.$queryRaw(
+      `SELECT dc.*, c.name as "categoryName", c.color
+       FROM doctor_categories dc
+       JOIN categories c ON c.id = dc."categoryId"
+       WHERE dc."doctorId" = $1`,
+      doctorId,
+    );
+    return rows;
+  }
+
+  async assignCategoryToDoctor(doctorId: string, categoryId: string, isPrimary = false) {
+    const cat = await prisma.category.findFirst({ where: { id: categoryId } });
+    if (!cat) throw AppError.notFound('Category');
+    const existing = await prisma.doctorCategory.findFirst({ where: { doctorId, categoryId } });
+    if (existing) return existing;
+    return prisma.doctorCategory.create({ data: { doctorId, categoryId, isPrimary } });
+  }
+
+  async removeCategoryFromDoctor(doctorId: string, categoryId: string) {
+    const existing = await prisma.doctorCategory.findFirst({ where: { doctorId, categoryId } });
+    if (!existing) throw AppError.notFound('DoctorCategory');
+    return prisma.doctorCategory.delete({ where: { id: (existing as any).id } });
+  }
+
   // ─── Audit Logs ──────────────────────────────────────────────────────
 
   async getAuditLogs(page = 1, limit = 50) {

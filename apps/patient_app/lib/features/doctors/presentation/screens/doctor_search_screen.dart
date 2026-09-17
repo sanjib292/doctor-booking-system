@@ -8,7 +8,14 @@ import '../../../../core/widgets/skeleton_loader.dart';
 import '../providers/doctors_provider.dart';
 
 class DoctorSearchScreen extends ConsumerStatefulWidget {
-  const DoctorSearchScreen({super.key});
+  const DoctorSearchScreen({
+    super.key,
+    this.initialCategoryId,
+    this.initialCategoryName,
+  });
+
+  final String? initialCategoryId;
+  final String? initialCategoryName;
 
   @override
   ConsumerState<DoctorSearchScreen> createState() => _DoctorSearchScreenState();
@@ -17,6 +24,21 @@ class DoctorSearchScreen extends ConsumerStatefulWidget {
 class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   final _searchController = TextEditingController();
   String? _selectedSort = 'rating';
+  String? _activeCategoryId;
+  String? _activeCategoryName;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialCategoryId != null) {
+      _activeCategoryId = widget.initialCategoryId;
+      _activeCategoryName = widget.initialCategoryName;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(doctorSearchFiltersProvider.notifier).state =
+            DoctorSearchFilters(categoryId: widget.initialCategoryId);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -71,6 +93,31 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
                 ],
               ),
             ),
+
+            // Active category filter chip
+            if (_activeCategoryId != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Row(
+                  children: [
+                    FilterChip(
+                      label: Text(_activeCategoryName ?? 'Category'),
+                      selected: true,
+                      onSelected: (_) {
+                        setState(() { _activeCategoryId = null; _activeCategoryName = null; });
+                        ref.read(doctorSearchFiltersProvider.notifier).state =
+                            ref.read(doctorSearchFiltersProvider).copyWith(categoryId: null);
+                      },
+                      deleteIcon: const Icon(Icons.close, size: 14),
+                      onDeleted: () {
+                        setState(() { _activeCategoryId = null; _activeCategoryName = null; });
+                        ref.read(doctorSearchFiltersProvider.notifier).state =
+                            ref.read(doctorSearchFiltersProvider).copyWith(categoryId: null);
+                      },
+                    ),
+                  ],
+                ),
+              ),
 
             // Sort chips
             SizedBox(
@@ -129,7 +176,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
                             consultationFee: (clinic?['consultationFee'] as num?)?.toDouble() ?? 0,
                             clinicCity: (clinic?['clinic'] as Map?)?['city'] as String? ?? '',
                             avatarUrl: doc['avatarUrl'] as String?,
-                            distance: doc['distance'] as double?,
+                            distance: (doc['distance'] as num?)?.toDouble(),
                             onTap: () => context.pushNamed(
                               'doctorProfile',
                               pathParameters: {'id': doc['id'] as String},

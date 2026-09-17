@@ -12,6 +12,7 @@ class AdminShell extends StatelessWidget {
     _NavItem(icon: Icons.people_outline, label: 'Users', route: '/users'),
     _NavItem(icon: Icons.location_city_outlined, label: 'Clinics', route: '/clinics'),
     _NavItem(icon: Icons.calendar_today_outlined, label: 'Appointments', route: '/appointments'),
+    _NavItem(icon: Icons.category_outlined, label: 'Categories', route: '/categories'),
   ];
 
   @override

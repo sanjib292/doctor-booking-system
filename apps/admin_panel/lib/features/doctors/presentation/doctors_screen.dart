@@ -60,6 +60,8 @@ class DoctorsScreen extends ConsumerWidget {
                       columns: const [
                         DataColumn(label: Text('Name')),
                         DataColumn(label: Text('Email')),
+                        DataColumn(label: Text('Specialization')),
+                        DataColumn(label: Text('Exp')),
                         DataColumn(label: Text('Status')),
                         DataColumn(label: Text('Rating')),
                         DataColumn(label: Text('Actions')),
@@ -67,9 +69,13 @@ class DoctorsScreen extends ConsumerWidget {
                       rows: list.map((doc) {
                         final status = doc['verificationStatus'] as String;
                         final isActive = doc['isActive'] as bool? ?? true;
+                        final specialty = _specialty(doc);
+                        final expYears = doc['experienceYears'] as int? ?? 0;
                         return DataRow(cells: [
                           DataCell(Text(doc['name'] as String? ?? '')),
                           DataCell(Text(doc['email'] as String? ?? '')),
+                          DataCell(Text(specialty.isEmpty ? '—' : specialty)),
+                          DataCell(Text(expYears > 0 ? '${expYears}yr' : '—')),
                           DataCell(
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -88,14 +94,14 @@ class DoctorsScreen extends ConsumerWidget {
                                 TextButton(
                                   onPressed: () async {
                                     await ref.read(_dioProvider).patch('/admin/doctors/${doc['id']}/verify', data: {'status': 'VERIFIED'});
-                                    ref.refresh(_doctorsProvider);
+                                    ref.invalidate(_doctorsProvider);
                                   },
                                   child: const Text('Verify'),
                                 ),
                               TextButton(
                                 onPressed: () async {
                                   await ref.read(_dioProvider).patch('/admin/doctors/${doc['id']}/toggle-active');
-                                  ref.refresh(_doctorsProvider);
+                                  ref.invalidate(_doctorsProvider);
                                 },
                                 child: Text(isActive ? 'Deactivate' : 'Activate'),
                               ),
@@ -114,48 +120,150 @@ class DoctorsScreen extends ConsumerWidget {
     );
   }
 
-  void _showCreateDoctorDialog(BuildContext context, WidgetRef ref) {
-    final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
+  String _specialty(Map<String, dynamic> doc) {
+    final cats = doc['categories'] as List?;
+    if (cats == null || cats.isEmpty) return '';
+    return ((cats.first as Map)['category'] as Map?)?['name'] as String? ?? '';
+  }
 
+  void _showCreateDoctorDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Add Doctor'),
-        content: SizedBox(
-          width: 400,
+      builder: (_) => _CreateDoctorDialog(
+        onCreated: () => ref.invalidate(_doctorsProvider),
+        dioProvider: _dioProvider,
+      ),
+    );
+  }
+}
+
+class _CreateDoctorDialog extends ConsumerStatefulWidget {
+  const _CreateDoctorDialog({required this.onCreated, required this.dioProvider});
+  final VoidCallback onCreated;
+  final Provider<Dio> dioProvider;
+
+  @override
+  ConsumerState<_CreateDoctorDialog> createState() => _CreateDoctorDialogState();
+}
+
+class _CreateDoctorDialogState extends ConsumerState<_CreateDoctorDialog> {
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _qualCtrl = TextEditingController();
+  final _expCtrl = TextEditingController();
+  String? _gender;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose();
+    _passCtrl.dispose(); _qualCtrl.dispose(); _expCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty ||
+        _passCtrl.text.isEmpty) {
+      setState(() => _error = 'Name, email, and password are required');
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final quals = _qualCtrl.text.trim().isEmpty
+          ? <String>[]
+          : _qualCtrl.text.split(',').map((q) => q.trim()).where((q) => q.isNotEmpty).toList();
+      final expYears = int.tryParse(_expCtrl.text.trim()) ?? 0;
+      await ref.read(widget.dioProvider).post('/admin/doctors', data: {
+        'name': _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'password': _passCtrl.text,
+        if (quals.isNotEmpty) 'qualifications': quals,
+        if (expYears > 0) 'experienceYears': expYears,
+        if (_gender != null) 'gender': _gender,
+      });
+      widget.onCreated();
+      if (mounted) Navigator.pop(context);
+    } on DioException catch (e) {
+      setState(() => _error = (e.response?.data?['error']?['message'] as String?) ?? 'Failed to create doctor');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Doctor'),
+      content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name')),
-              const SizedBox(height: 12),
-              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
-              const SizedBox(height: 12),
-              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone')),
-              const SizedBox(height: 12),
-              TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Temporary Password')),
+              if (_error != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                  child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const Text('Basic Info', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone (with country code)', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: _passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Temporary Password *', border: OutlineInputBorder())),
+              const SizedBox(height: 16),
+              const Text('Professional Details', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _qualCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Qualifications (comma-separated)',
+                  hintText: 'MBBS, MD, MS',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _expCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Experience (years)', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _gender,
+                decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'MALE', child: Text('Male')),
+                  DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+                  DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+                ],
+                onChanged: (v) => setState(() => _gender = v),
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () async {
-              await ref.read(_dioProvider).post('/admin/doctors', data: {
-                'name': nameCtrl.text.trim(),
-                'email': emailCtrl.text.trim(),
-                'phone': phoneCtrl.text.trim(),
-                'password': passCtrl.text,
-              });
-              ref.refresh(_doctorsProvider);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Create'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: _loading ? null : _submit,
+          child: _loading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Create'),
+        ),
+      ],
     );
   }
 }

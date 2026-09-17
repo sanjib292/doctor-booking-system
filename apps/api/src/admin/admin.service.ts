@@ -209,7 +209,57 @@ export class AdminService {
     return buildPaginatedResult(data, total, page, limit);
   }
 
+  // ─── Appointments ────────────────────────────────────────────────────
+
+  async getAppointments(page = 1, limit = 20, status?: string, doctorId?: string, patientId?: string) {
+    const { skip, take } = buildPagination({ page, limit });
+    const where: any = {};
+    if (status) where.status = status;
+    if (doctorId) where.doctorId = doctorId;
+    if (patientId) where.patientId = patientId;
+
+    const [flatAppts, total] = await Promise.all([
+      prisma.appointment.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),
+      prisma.appointment.count({ where }),
+    ]);
+
+    if (flatAppts.length === 0) return buildPaginatedResult([], 0, page, limit);
+
+    const apptIds = (flatAppts as any[]).map((a: any) => a.id);
+    const apptRows = await prisma.$queryRaw(
+      `SELECT a.id,
+              u.id as "patientId", u.name as "patientName", u."avatarUrl" as "patientAvatar",
+              d.id as "doctorId", d.name as "doctorName", d."avatarUrl" as "doctorAvatar",
+              c.id as "clinicId", c.name as "clinicName"
+       FROM appointments a
+       JOIN users u ON u.id = a."patientId"
+       JOIN doctors d ON d.id = a."doctorId"
+       LEFT JOIN clinics c ON c.id = a."clinicId"
+       WHERE a.id = ANY($1)`,
+      apptIds,
+    );
+
+    const lookup = new Map<string, any>();
+    for (const row of apptRows as any[]) lookup.set(row.id, row);
+
+    const data = (flatAppts as any[]).map((a: any) => {
+      const rel = lookup.get(a.id) ?? {};
+      return {
+        ...a,
+        patient: { id: rel.patientId, name: rel.patientName, avatarUrl: rel.patientAvatar },
+        doctor: { id: rel.doctorId, name: rel.doctorName, avatarUrl: rel.doctorAvatar },
+        clinic: rel.clinicId ? { id: rel.clinicId, name: rel.clinicName } : null,
+      };
+    });
+
+    return buildPaginatedResult(data, total, page, limit);
+  }
+
   // ─── Category Management ─────────────────────────────────────────────
+
+  async getAllCategories() {
+    return prisma.category.findMany({ where: { deletedAt: null }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
+  }
 
   async createCategory(name: string, iconUrl?: string, color?: string) {
     const slug = name.toLowerCase().replace(/\s+/g, '-');

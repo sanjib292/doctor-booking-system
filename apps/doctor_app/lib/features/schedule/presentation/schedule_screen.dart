@@ -29,15 +29,15 @@ final _scheduleProvider =
   return Map<String, dynamic>.from(response.data['data'] as Map);
 });
 
-const _days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const _days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 const _dayLabels = {
-  'MON': 'Monday',
-  'TUE': 'Tuesday',
-  'WED': 'Wednesday',
-  'THU': 'Thursday',
-  'FRI': 'Friday',
-  'SAT': 'Saturday',
-  'SUN': 'Sunday',
+  'MONDAY': 'Monday',
+  'TUESDAY': 'Tuesday',
+  'WEDNESDAY': 'Wednesday',
+  'THURSDAY': 'Thursday',
+  'FRIDAY': 'Friday',
+  'SATURDAY': 'Saturday',
+  'SUNDAY': 'Sunday',
 };
 
 class ScheduleScreen extends ConsumerWidget {

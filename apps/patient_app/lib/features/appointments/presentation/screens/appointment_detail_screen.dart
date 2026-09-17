@@ -79,8 +79,8 @@ class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScree
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Dr. ${doctor['name'] ?? ''}', style: AppTextStyles.titleMedium),
-                        if (doctor['specialization'] != null)
-                          Text(doctor['specialization'] as String, style: AppTextStyles.bodySmall),
+                        if (_doctorSpecialty(doctor).isNotEmpty)
+                          Text(_doctorSpecialty(doctor), style: AppTextStyles.bodySmall),
                       ],
                     ),
                   ),
@@ -96,7 +96,7 @@ class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScree
                   _DetailRow(
                     icon: Icons.calendar_today_outlined,
                     label: 'Date',
-                    value: appt['date'] as String? ?? '',
+                    value: _formatDate(appt['date'] as String? ?? ''),
                   ),
                   const Divider(height: 20),
                   _DetailRow(
@@ -160,6 +160,26 @@ class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScree
         ),
       ),
     );
+  }
+
+  String _formatDate(String raw) {
+    if (raw.isEmpty) return '';
+    final date = raw.length >= 10 ? raw.substring(0, 10) : raw;
+    try {
+      final parts = date.split('-');
+      if (parts.length != 3) return date;
+      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      final month = int.tryParse(parts[1]) ?? 0;
+      return '${parts[2]} ${month > 0 && month <= 12 ? months[month - 1] : parts[1]} ${parts[0]}';
+    } catch (_) { return date; }
+  }
+
+  String _doctorSpecialty(Map doctor) {
+    final cats = doctor['categories'] as List?;
+    if (cats != null && cats.isNotEmpty) {
+      return ((cats.first as Map)['category'] as Map?)?['name'] as String? ?? '';
+    }
+    return doctor['specialization'] as String? ?? '';
   }
 
   Future<void> _confirmCancel() async {

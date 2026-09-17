@@ -283,7 +283,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         consultationFee: (clinic?['consultationFee'] as num?)?.toDouble() ?? 0,
                         clinicCity: (clinic?['clinic'] as Map?)?['city'] as String? ?? '',
                         avatarUrl: doc['avatarUrl'] as String?,
-                        distance: doc['distance'] as double?,
+                        distance: (doc['distance'] as num?)?.toDouble(),
                         onTap: () => context.pushNamed(
                           'doctorProfile',
                           pathParameters: {'id': doc['id'] as String},
@@ -350,7 +350,10 @@ class _CategoriesSection extends ConsumerWidget {
             ));
             final icon = _categoryIcon(cat['name'] as String? ?? '');
             return GestureDetector(
-              onTap: () => context.goNamed('search'),
+              onTap: () => context.goNamed(
+                'search',
+                extra: {'categoryId': cat['id'], 'categoryName': cat['name']},
+              ),
               child: Column(
                 children: [
                   Container(

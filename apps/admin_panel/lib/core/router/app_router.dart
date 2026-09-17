@@ -8,6 +8,7 @@ import '../../features/doctors/presentation/doctors_screen.dart';
 import '../../features/users/presentation/users_screen.dart';
 import '../../features/clinics/presentation/clinics_screen.dart';
 import '../../features/appointments/presentation/appointments_screen.dart';
+import '../../features/categories/presentation/categories_screen.dart';
 import '../widgets/admin_shell.dart';
 
 final routerProvider = Provider<GoRouter>((_) {
@@ -31,6 +32,7 @@ final routerProvider = Provider<GoRouter>((_) {
           GoRoute(path: '/users', builder: (_, __) => const UsersScreen()),
           GoRoute(path: '/clinics', builder: (_, __) => const ClinicsScreen()),
           GoRoute(path: '/appointments', builder: (_, __) => const AdminAppointmentsScreen()),
+          GoRoute(path: '/categories', builder: (_, __) => const CategoriesScreen()),
         ],
       ),
     ],

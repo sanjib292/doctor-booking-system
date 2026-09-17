@@ -40,10 +40,16 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   Widget _buildContent(Map<String, dynamic> doctor) {
     final theme = Theme.of(context);
     final clinics = (doctor['clinics'] as List?) ?? [];
-    final primaryClinic = clinics.isNotEmpty ? clinics.first as Map : null;
+    final primaryClinic = clinics.isNotEmpty
+        ? (clinics.firstWhere((c) => (c as Map)['isPrimary'] == true, orElse: () => clinics.first) as Map)
+        : null;
     final fee = (primaryClinic?['consultationFee'] as num?)?.toDouble() ?? 0;
     final clinicInfo = primaryClinic?['clinic'] as Map?;
     final clinicImages = (clinicInfo?['images'] as List?)?.cast<String>() ?? [];
+    final categories = (doctor['categories'] as List?) ?? [];
+    final specialization = categories.isNotEmpty
+        ? ((categories.first as Map)['category'] as Map?)?['name'] as String? ?? ''
+        : '';
 
     return CustomScrollView(
       slivers: [
@@ -106,9 +112,16 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Dr. ${doctor['name']}',
+                        'Dr. ${doctor['name'] ?? ''}',
                         style: AppTextStyles.headlineSmall.copyWith(color: Colors.white),
                       ),
+                      if (specialization.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          specialization,
+                          style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Semantics(
                         label: 'Rating: ${(doctor['averageRating'] as num?)?.toStringAsFixed(1) ?? '0'} out of 5',
@@ -138,21 +151,21 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 Row(
                   children: [
                     _StatBox(
-                      value: '${doctor['experienceYears']}yr',
+                      value: '${doctor['experienceYears'] ?? 0}yr',
                       label: 'Experience',
-                      semanticLabel: '${doctor['experienceYears']} years experience',
+                      semanticLabel: '${doctor['experienceYears'] ?? 0} years experience',
                     ),
                     const SizedBox(width: 12),
                     _StatBox(
-                      value: '${doctor['totalReviews']}',
+                      value: '${doctor['totalReviews'] ?? 0}',
                       label: 'Reviews',
-                      semanticLabel: '${doctor['totalReviews']} patient reviews',
+                      semanticLabel: '${doctor['totalReviews'] ?? 0} patient reviews',
                     ),
                     const SizedBox(width: 12),
                     _StatBox(
-                      value: '₹${fee.toStringAsFixed(0)}',
+                      value: fee > 0 ? '₹${fee.toStringAsFixed(0)}' : 'Free',
                       label: 'Fee',
-                      semanticLabel: 'Consultation fee ₹${fee.toStringAsFixed(0)}',
+                      semanticLabel: fee > 0 ? 'Consultation fee ₹${fee.toStringAsFixed(0)}' : 'Free consultation',
                     ),
                   ],
                 ),
@@ -260,6 +273,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   }
 
   Widget _doctorInitialAvatar(Map<String, dynamic> doctor) {
+    final name = (doctor['name'] as String?) ?? '';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'D';
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -270,7 +285,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       ),
       child: Center(
         child: Text(
-          (doctor['name'] as String).substring(0, 1).toUpperCase(),
+          initial,
           style: const TextStyle(
               fontSize: 80, color: Colors.white, fontWeight: FontWeight.w700),
         ),

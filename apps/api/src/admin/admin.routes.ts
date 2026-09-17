@@ -72,7 +72,21 @@ router.patch('/clinics/:id', asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, clinic, 'Clinic updated');
 }));
 
+// Appointments
+router.get('/appointments', asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.getAppointments(
+    Number(req.query.page ?? 1), Number(req.query.limit ?? 20),
+    req.query.status as string, req.query.doctorId as string, req.query.patientId as string,
+  );
+  sendSuccess(res, result.data, undefined, 200, result.meta);
+}));
+
 // Category management
+router.get('/categories', asyncHandler(async (req: Request, res: Response) => {
+  const cats = await service.getAllCategories();
+  sendSuccess(res, cats);
+}));
+
 router.post('/categories', asyncHandler(async (req: Request, res: Response) => {
   const cat = await service.createCategory(req.body.name, req.body.iconUrl, req.body.color);
   sendCreated(res, cat);

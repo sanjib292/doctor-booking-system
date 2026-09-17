@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/network/api_client.dart';
 
+const _sentinel = Object();
+
 final locationProvider = FutureProvider<Position?>((ref) async {
   try {
     final permission = await Geolocator.checkPermission();
@@ -76,6 +78,30 @@ class DoctorSearchFilters {
   final String? city;
   final String sortBy;
   final int page;
+
+  DoctorSearchFilters copyWith({
+    String? search,
+    Object? categoryId = _sentinel,
+    double? minRating,
+    double? maxFee,
+    double? minFee,
+    String? gender,
+    String? city,
+    String? sortBy,
+    int? page,
+  }) {
+    return DoctorSearchFilters(
+      search: search ?? this.search,
+      categoryId: categoryId == _sentinel ? this.categoryId : categoryId as String?,
+      minRating: minRating ?? this.minRating,
+      maxFee: maxFee ?? this.maxFee,
+      minFee: minFee ?? this.minFee,
+      gender: gender ?? this.gender,
+      city: city ?? this.city,
+      sortBy: sortBy ?? this.sortBy,
+      page: page ?? this.page,
+    );
+  }
 
   Map<String, dynamic> toQueryParams() => {
     if (search != null && search!.isNotEmpty) 'search': search,

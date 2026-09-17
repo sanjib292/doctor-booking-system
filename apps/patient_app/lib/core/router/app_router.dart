@@ -65,7 +65,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/search',
             name: 'search',
-            builder: (_, __) => const DoctorSearchScreen(),
+            builder: (_, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return DoctorSearchScreen(
+                initialCategoryId: extra?['categoryId'] as String?,
+                initialCategoryName: extra?['categoryName'] as String?,
+              );
+            },
           ),
           GoRoute(
             path: '/appointments',

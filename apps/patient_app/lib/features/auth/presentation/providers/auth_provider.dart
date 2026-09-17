@@ -34,6 +34,10 @@ class AuthService {
     return data;
   }
 
+  // Returns the response data. If the backend returned tokens (new flow),
+  // they are saved and the caller should navigate to home.
+  // If the backend returned only { expiresIn } (old/undeployed backend),
+  // tokens will not be present and the caller should navigate to OTP.
   Future<Map<String, dynamic>> registerPatient({
     required String name,
     required String email,
@@ -51,11 +55,13 @@ class AuthService {
       if (age != null) 'age': age,
     });
     final data = response.data['data'] as Map<String, dynamic>;
-    await _storage.saveTokens(
-      accessToken: data['accessToken'] as String,
-      refreshToken: data['refreshToken'] as String,
-    );
-    await _storage.saveUser(data['user'] as Map<String, dynamic>);
+    if (data['accessToken'] != null) {
+      await _storage.saveTokens(
+        accessToken: data['accessToken'] as String,
+        refreshToken: data['refreshToken'] as String,
+      );
+      await _storage.saveUser(data['user'] as Map<String, dynamic>);
+    }
     return data;
   }
 

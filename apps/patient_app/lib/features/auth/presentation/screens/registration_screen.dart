@@ -66,7 +66,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
 
     try {
       final phone = '+91${_phoneController.text.trim()}';
-      await ref.read(authServiceProvider).registerPatient(
+      final data = await ref.read(authServiceProvider).registerPatient(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         phone: phone,
@@ -76,7 +76,13 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
       );
 
       if (mounted) {
-        context.goNamed('home');
+        // New backend returns tokens → go home directly.
+        // Old backend returns { expiresIn } → fall back to OTP screen.
+        if (data['accessToken'] != null) {
+          context.goNamed('home');
+        } else {
+          context.goNamed('otpVerification', extra: phone);
+        }
       }
     } on DioException catch (e) {
       if (mounted) {

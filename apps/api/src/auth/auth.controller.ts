@@ -23,6 +23,12 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
   res.status(status).json({ success: true, data: result });
 });
 
+export const loginWithPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { identifier, password, fcmToken } = req.body;
+  const result = await authService.loginWithPassword(identifier, password, fcmToken);
+  sendSuccess(res, result, 'Login successful');
+});
+
 export const doctorLogin = asyncHandler(async (req: Request, res: Response) => {
   const { email, password, fcmToken } = req.body;
   const result = await authService.doctorLogin(email, password, fcmToken);

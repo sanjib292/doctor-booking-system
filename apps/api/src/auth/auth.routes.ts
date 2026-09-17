@@ -8,6 +8,7 @@ import {
   doctorLoginSchema,
   adminLoginSchema,
   refreshTokenSchema,
+  patientLoginSchema,
 } from './auth.schema';
 
 const router = Router();
@@ -20,6 +21,7 @@ const router = Router();
  *     tags: [Auth]
  */
 router.post('/patient/register', validate(registerPatientSchema), controller.registerPatient);
+router.post('/patient/login', validate(patientLoginSchema), controller.loginWithPassword);
 router.post('/patient/send-otp', validate(sendOtpSchema), controller.sendOtp);
 
 /**

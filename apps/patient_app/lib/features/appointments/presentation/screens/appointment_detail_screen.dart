@@ -67,10 +67,10 @@ class _AppointmentDetailScreenState extends ConsumerState<AppointmentDetailScree
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor: AppColors.primaryContainer,
+                    backgroundColor: theme.colorScheme.primaryContainer,
                     child: Text(
                       (doctor['name'] as String? ?? 'D').substring(0, 1),
-                      style: AppTextStyles.headlineSmall.copyWith(color: AppColors.primary),
+                      style: AppTextStyles.headlineSmall.copyWith(color: theme.colorScheme.primary),
                     ),
                   ),
                   const SizedBox(width: 16),

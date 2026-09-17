@@ -145,13 +145,13 @@ class DoctorCard extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryContainer,
+                          color: theme.colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           'Book',
                           style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.primary,
+                            color: theme.colorScheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

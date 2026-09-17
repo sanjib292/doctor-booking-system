@@ -37,3 +37,9 @@ export const registerPatientSchema = z.object({
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1),
 });
+
+export const patientLoginSchema = z.object({
+  identifier: z.string().min(1, 'Phone or email required'),
+  password: z.string().min(1, 'Password required'),
+  fcmToken: z.string().optional(),
+});

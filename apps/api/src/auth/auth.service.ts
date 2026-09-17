@@ -129,6 +129,38 @@ export class AuthService {
     return { ...tokens, user: safeUser, isNewUser };
   }
 
+  async loginWithPassword(
+    identifier: string,
+    password: string,
+    fcmToken?: string,
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
+    // Find by phone or email
+    const isPhone = /^\+?[0-9]{10,15}$/.test(identifier.replace(/\s/g, ''));
+    const user = isPhone
+      ? await prisma.user.findUnique({ where: { phone: identifier } })
+      : await prisma.user.findUnique({ where: { email: identifier } });
+
+    if (!user || user.role !== Role.PATIENT) throw AppError.unauthorized('Invalid credentials');
+    if (user.isBlocked) throw AppError.forbidden('Account is blocked');
+    if (!user.passwordHash) throw AppError.badRequest('This account uses OTP login. Please use OTP to sign in.');
+
+    const valid = await comparePassword(password, user.passwordHash);
+    if (!valid) throw AppError.unauthorized('Invalid credentials');
+
+    if (fcmToken && user.fcmToken !== fcmToken) {
+      await prisma.user.update({ where: { id: user.id }, data: { fcmToken } });
+    }
+
+    const tokens = generateTokenPair({ id: user.id, role: user.role, phone: user.phone });
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.refreshToken.create({
+      data: { token: tokens.refreshToken, userId: user.id, expiresAt },
+    });
+
+    const { passwordHash: _ph, ...safeUser } = user as any;
+    return { ...tokens, user: safeUser };
+  }
+
   async doctorLogin(
     email: string,
     password: string,

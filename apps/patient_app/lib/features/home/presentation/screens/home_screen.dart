@@ -45,7 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Good morning 👋',
+                                  _greeting(),
                                   style: AppTextStyles.bodyMedium.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),
@@ -282,6 +282,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  static IconData _categoryIcon(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('cardio') || n.contains('heart')) return Icons.favorite_rounded;
+    if (n.contains('neuro') || n.contains('brain')) return Icons.psychology_rounded;
+    if (n.contains('ortho') || n.contains('bone') || n.contains('joint')) return Icons.accessibility_new_rounded;
+    if (n.contains('derm') || n.contains('skin')) return Icons.face_retouching_natural_rounded;
+    if (n.contains('pediatr') || n.contains('child')) return Icons.child_care_rounded;
+    if (n.contains('gynec') || n.contains('obste') || n.contains('women')) return Icons.pregnant_woman_rounded;
+    if (n.contains('ent') || n.contains('ear') || n.contains('nose')) return Icons.hearing_rounded;
+    if (n.contains('eye') || n.contains('ophthal')) return Icons.visibility_rounded;
+    if (n.contains('dental') || n.contains('tooth') || n.contains('teeth')) return Icons.clean_hands_rounded;
+    if (n.contains('psych') || n.contains('mental')) return Icons.self_improvement_rounded;
+    if (n.contains('onco') || n.contains('cancer')) return Icons.biotech_rounded;
+    if (n.contains('gastro') || n.contains('digest') || n.contains('liver')) return Icons.sick_rounded;
+    if (n.contains('urol') || n.contains('kidney')) return Icons.water_drop_rounded;
+    if (n.contains('pulmo') || n.contains('lung') || n.contains('respir')) return Icons.air_rounded;
+    if (n.contains('endocrin') || n.contains('diabet') || n.contains('thyroid')) return Icons.monitor_heart_rounded;
+    if (n.contains('general') || n.contains('family') || n.contains('physician')) return Icons.local_hospital_rounded;
+    return Icons.medical_services_rounded;
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   String _getSpecialty(Map<String, dynamic> doc) {
     final cats = doc['categories'] as List?;
     if (cats == null || cats.isEmpty) return 'General Physician';
@@ -320,6 +348,7 @@ class _CategoriesSection extends ConsumerWidget {
               (cat['color'] as String? ?? '#4CAF50').replaceFirst('#', 'FF'),
               radix: 16,
             ));
+            final icon = _categoryIcon(cat['name'] as String? ?? '');
             return GestureDetector(
               onTap: () => context.goNamed('search'),
               child: Column(
@@ -331,7 +360,7 @@ class _CategoriesSection extends ConsumerWidget {
                       color: color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Icon(Icons.medical_services_outlined, color: color, size: 28),
+                    child: Icon(icon, color: color, size: 28),
                   ),
                   const SizedBox(height: 6),
                   SizedBox(

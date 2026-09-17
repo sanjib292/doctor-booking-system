@@ -54,6 +54,23 @@ class AuthService {
     });
   }
 
+  Future<Map<String, dynamic>> loginWithPassword({
+    required String identifier,
+    required String password,
+  }) async {
+    final response = await _dio.post('/auth/patient/login', data: {
+      'identifier': identifier,
+      'password': password,
+    });
+    final data = response.data['data'] as Map<String, dynamic>;
+    await _storage.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+    await _storage.saveUser(data['user'] as Map<String, dynamic>);
+    return data;
+  }
+
   Future<void> completeRegistration({
     required String name,
     String? gender,

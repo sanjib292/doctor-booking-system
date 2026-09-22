@@ -1,37 +1,33 @@
-import nodemailer from 'nodemailer';
 import { env } from '../../config/env';
 
 const logger = { info: console.log, warn: console.warn, error: console.error };
 
-function createTransporter() {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
-  return nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT ?? 587,
-    secure: (env.SMTP_PORT ?? 587) === 465,
-    auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-    connectionTimeout: 8000,
-    greetingTimeout: 8000,
-    socketTimeout: 8000,
-  });
-}
-
 async function send(to: string, subject: string, html: string) {
-  const transporter = createTransporter();
-  if (!transporter) {
-    logger.info(`[EMAIL - no SMTP configured] To: ${to} | ${subject}`);
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    logger.info(`[EMAIL] No RESEND_API_KEY set — skipping. To: ${to} | ${subject}`);
     return;
   }
+
+  const from = env.EMAIL_FROM ?? 'DoctorBook <onboarding@resend.dev>';
+
   try {
-    await transporter.sendMail({
-      from: env.EMAIL_FROM ?? env.SMTP_USER,
-      to,
-      subject,
-      html,
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: [to], subject, html }),
     });
-    logger.info(`Email sent to ${to}: ${subject}`);
+    const data = await res.json() as any;
+    if (!res.ok) {
+      logger.error(`[EMAIL] Resend API error (${res.status}): ${JSON.stringify(data)}`);
+    } else {
+      logger.info(`[EMAIL] Sent to ${to}: ${subject} (id=${data.id})`);
+    }
   } catch (err) {
-    logger.error(`Failed to send email to ${to}: ${err}`);
+    logger.error(`[EMAIL] Failed to send to ${to}: ${err}`);
   }
 }
 

@@ -73,8 +73,10 @@ export class AuthService {
 
     const userEmail = (existingUser as any).email as string | undefined;
     if (emailConfigured && userEmail) {
-      await EmailService.sendOtpEmail(userEmail, code, (existingUser as any).name);
-      logger.info(`OTP sent via email to ${userEmail}`);
+      // Non-blocking — don't let SMTP delay or failure hold up the response
+      EmailService.sendOtpEmail(userEmail, code, (existingUser as any).name)
+        .then(() => logger.info(`OTP sent via email to ${userEmail}`))
+        .catch((err: any) => logger.error(`Failed to send OTP email: ${err}`));
     } else {
       logger.info(`OTP for ${phone}: ${code} (set SMTP env vars to send via email)`);
     }

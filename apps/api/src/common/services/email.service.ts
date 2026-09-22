@@ -3,28 +3,34 @@ import { env } from '../../config/env';
 const logger = { info: console.log, warn: console.warn, error: console.error };
 
 async function send(to: string, subject: string, html: string) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    logger.info(`[EMAIL] No RESEND_API_KEY set — skipping. To: ${to} | ${subject}`);
+    logger.info(`[EMAIL] No BREVO_API_KEY set — skipping. To: ${to} | ${subject}`);
     return;
   }
 
-  const from = env.EMAIL_FROM ?? 'DoctorBook <onboarding@resend.dev>';
+  const senderEmail = process.env.SMTP_USER ?? 'doctorbook672@gmail.com';
+  const senderName = 'DoctorBook';
 
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
     const data = await res.json() as any;
     if (!res.ok) {
-      logger.error(`[EMAIL] Resend API error (${res.status}): ${JSON.stringify(data)}`);
+      logger.error(`[EMAIL] Brevo API error (${res.status}): ${JSON.stringify(data)}`);
     } else {
-      logger.info(`[EMAIL] Sent to ${to}: ${subject} (id=${data.id})`);
+      logger.info(`[EMAIL] Sent to ${to}: ${subject} (messageId=${data.messageId})`);
     }
   } catch (err) {
     logger.error(`[EMAIL] Failed to send to ${to}: ${err}`);

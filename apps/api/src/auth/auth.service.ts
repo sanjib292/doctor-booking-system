@@ -51,8 +51,11 @@ export class AuthService {
   }
 
   async sendOtp(phone: string): Promise<{ expiresIn: number }> {
+    logger.info(`[sendOtp] START phone=${phone}`);
+
     // Only allow OTP for existing registered patients
     const existingUser = await prisma.user.findUnique({ where: { phone } });
+    logger.info(`[sendOtp] user lookup done. found=${!!existingUser} email=${(existingUser as any)?.email ?? 'NONE'}`);
     if (!existingUser) throw AppError.notFound('Phone number not registered. Please contact support.');
     if (existingUser.isBlocked) throw AppError.forbidden('Account is blocked');
 
@@ -61,26 +64,35 @@ export class AuthService {
       where: { phone, isUsed: false },
       data: { isUsed: true },
     });
+    logger.info(`[sendOtp] old OTPs invalidated`);
 
-    const emailConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const emailConfigured = !!(smtpHost && smtpUser && smtpPass);
     const smsConfigured = !!(process.env.TWILIO_ACCOUNT_SID || process.env.SMS_API_KEY);
+    logger.info(`[sendOtp] SMTP_HOST="${smtpHost}" SMTP_USER="${smtpUser}" SMTP_PASS_LENGTH=${smtpPass?.length ?? 0} emailConfigured=${emailConfigured}`);
+
     const code = (emailConfigured || smsConfigured) ? generateOtp() : '123456';
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await prisma.otpCode.create({
       data: { phone, code, expiresAt },
     });
+    logger.info(`[sendOtp] OTP saved. code=${code}`);
 
     const userEmail = (existingUser as any).email as string | undefined;
     if (emailConfigured && userEmail) {
+      logger.info(`[sendOtp] firing email to ${userEmail} (non-blocking)`);
       // Non-blocking — don't let SMTP delay or failure hold up the response
       EmailService.sendOtpEmail(userEmail, code, (existingUser as any).name)
-        .then(() => logger.info(`OTP sent via email to ${userEmail}`))
-        .catch((err: any) => logger.error(`Failed to send OTP email: ${err}`));
+        .then(() => logger.info(`[sendOtp] email sent OK to ${userEmail}`))
+        .catch((err: any) => logger.error(`[sendOtp] email FAILED: ${err}`));
     } else {
-      logger.info(`OTP for ${phone}: ${code} (set SMTP env vars to send via email)`);
+      logger.info(`[sendOtp] skipping email. emailConfigured=${emailConfigured} userEmail=${userEmail}`);
     }
 
+    logger.info(`[sendOtp] DONE - returning response`);
     return { expiresIn: OTP_EXPIRY_MINUTES * 60 };
   }
 

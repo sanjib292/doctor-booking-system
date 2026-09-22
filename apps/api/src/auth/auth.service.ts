@@ -240,8 +240,8 @@ export class AuthService {
 
     await prisma.refreshToken.update({ where: { id: stored.id }, data: { isRevoked: true } });
 
-    // Strip JWT claims (exp, iat) so generateTokenPair can set fresh ones
-    const { exp: _exp, iat: _iat, ...cleanPayload } = payload as any;
+    // Strip JWT standard claims so generateTokenPair can set fresh ones
+    const { exp: _exp, iat: _iat, aud: _aud, iss: _iss, ...cleanPayload } = payload as any;
     const tokens = generateTokenPair(cleanPayload);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 

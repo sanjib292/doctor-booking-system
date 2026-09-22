@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -94,20 +95,68 @@ class _AppointmentList extends ConsumerWidget {
   }
 }
 
-class _AppointmentCard extends StatelessWidget {
+String _countdownText(Map<String, dynamic> appointment) {
+  final status = appointment['status'] as String;
+  if (!['CONFIRMED', 'PENDING'].contains(status)) return '';
+  try {
+    final dateStr = (appointment['date'] as String? ?? '').substring(0, 10);
+    final timeStr = appointment['startTime'] as String? ?? '00:00';
+    final parts = timeStr.split(':');
+    final apptDt = DateTime.parse('${dateStr}T${parts[0].padLeft(2, '0')}:${parts.length > 1 ? parts[1].padLeft(2, '0') : '00'}:00');
+    final diff = apptDt.difference(DateTime.now());
+    if (diff.isNegative) return '';
+    final d = diff.inDays;
+    final h = diff.inHours % 24;
+    final m = diff.inMinutes % 60;
+    if (d > 0) return 'in ${d}d ${h}h ${m}m';
+    if (h > 0) return 'in ${h}h ${m}m';
+    if (m > 0) return 'in ${m}m';
+    return 'Starting soon';
+  } catch (_) {
+    return '';
+  }
+}
+
+class _AppointmentCard extends StatefulWidget {
   const _AppointmentCard({required this.appointment, required this.onTap});
   final Map<String, dynamic> appointment;
   final VoidCallback onTap;
 
   @override
+  State<_AppointmentCard> createState() => _AppointmentCardState();
+}
+
+class _AppointmentCardState extends State<_AppointmentCard> {
+  Timer? _timer;
+  String _countdown = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _countdown = _countdownText(widget.appointment);
+    if (_countdown.isNotEmpty) {
+      _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) setState(() => _countdown = _countdownText(widget.appointment));
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final appointment = widget.appointment;
     final theme = Theme.of(context);
     final status = appointment['status'] as String;
     final doctor = appointment['doctor'] as Map?;
     final clinic = appointment['clinic'] as Map?;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -155,11 +204,30 @@ class _AppointmentCard extends StatelessWidget {
               children: [
                 const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.primary),
                 const SizedBox(width: 6),
-                Text(
-                  '${appointment['date'] as String? ?? ''} at ${appointment['startTime'] as String? ?? ''}',
-                  style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
+                Expanded(
+                  child: Text(
+                    '${appointment['date'] as String? ?? ''} at ${appointment['startTime'] as String? ?? ''}',
+                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
+                  ),
                 ),
-                const Spacer(),
+                if (_countdown.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.timer_outlined, size: 12, color: AppColors.primary),
+                        const SizedBox(width: 3),
+                        Text(_countdown, style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 const Icon(Icons.chevron_right_rounded, size: 20),
               ],
             ),

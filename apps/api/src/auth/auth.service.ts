@@ -6,6 +6,7 @@ import { Role } from '@prisma/client';
 import { env } from '../config/env';
 import { logger } from '../common/utils/logger';
 import { OAuth2Client } from 'google-auth-library';
+import * as EmailService from '../common/services/email.service';
 
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_OTP_ATTEMPTS = 5;
@@ -61,15 +62,22 @@ export class AuthService {
       data: { isUsed: true },
     });
 
+    const emailConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
     const smsConfigured = !!(process.env.TWILIO_ACCOUNT_SID || process.env.SMS_API_KEY);
-    const code = smsConfigured ? generateOtp() : '123456';
+    const code = (emailConfigured || smsConfigured) ? generateOtp() : '123456';
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await prisma.otpCode.create({
       data: { phone, code, expiresAt },
     });
 
-    logger.info(`OTP for ${phone}: ${code} (hardcoded for testing)`);
+    const userEmail = (existingUser as any).email as string | undefined;
+    if (emailConfigured && userEmail) {
+      await EmailService.sendOtpEmail(userEmail, code, (existingUser as any).name);
+      logger.info(`OTP sent via email to ${userEmail}`);
+    } else {
+      logger.info(`OTP for ${phone}: ${code} (set SMTP env vars to send via email)`);
+    }
 
     return { expiresIn: OTP_EXPIRY_MINUTES * 60 };
   }

@@ -106,6 +106,31 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
 
+              const SizedBox(height: 16),
+
+              // Time disclaimer
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 18, color: Colors.amber.shade800),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Your slot time is approximate and may vary slightly depending on earlier consultations. Please arrive 5–10 minutes early.',
+                        style: TextStyle(fontSize: 12, color: Colors.amber.shade900, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const Spacer(),
 
               AppButton(

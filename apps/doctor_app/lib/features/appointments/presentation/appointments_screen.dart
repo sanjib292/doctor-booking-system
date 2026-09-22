@@ -268,6 +268,10 @@ class _AppointmentCard extends ConsumerWidget {
                 onUpdated: onStatusUpdated,
               ),
             ],
+            if (status == 'CONFIRMED' || status == 'PENDING') ...[
+              const SizedBox(height: 8),
+              _CancelButton(apptId: appt['id'] as String, onCancelled: onStatusUpdated),
+            ],
           ],
         ),
       ),
@@ -362,6 +366,109 @@ class _StatusActionsState extends ConsumerState<_StatusActions> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _CancelButton extends ConsumerStatefulWidget {
+  const _CancelButton({required this.apptId, required this.onCancelled});
+  final String apptId;
+  final VoidCallback onCancelled;
+
+  @override
+  ConsumerState<_CancelButton> createState() => _CancelButtonState();
+}
+
+class _CancelButtonState extends ConsumerState<_CancelButton> {
+  bool _loading = false;
+  final _reasonCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showCancelDialog() async {
+    _reasonCtrl.clear();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Appointment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'You must provide a reason for cancellation. A sorry message will be sent to the patient.',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Reason for cancellation *',
+                hintText: 'e.g. Emergency surgery, Doctor unavailable...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              if (_reasonCtrl.text.trim().length < 5) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Please provide a reason (min 5 characters)')),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Cancel Appointment'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(dioProvider).post('/appointments/${widget.apptId}/cancel', data: {
+        'reason': _reasonCtrl.text.trim(),
+      });
+      widget.onCancelled();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Appointment cancelled. A sorry message has been sent to the patient.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox(height: 32, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _showCancelDialog,
+        icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.red),
+        label: const Text('Cancel Appointment', style: TextStyle(color: Colors.red)),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.red),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
     );
   }
 }

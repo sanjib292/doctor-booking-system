@@ -4,6 +4,7 @@ import { AppError } from '../common/errors/AppError';
 import { env } from '../config/env';
 import { buildPagination, buildPaginatedResult } from '../common/types/pagination';
 import { addMinutes, format, parseISO, isAfter, isBefore, eachMinuteOfInterval } from '../common/utils/dateUtils';
+import * as EmailService from '../common/services/email.service';
 
 export class AppointmentsService {
   // ─── Slot Generation ────────────────────────────────────────────────────
@@ -152,17 +153,35 @@ export class AppointmentsService {
         },
       });
 
-      // Fetch doctor and clinic names for the confirmation response
-      const [doctorData, clinicData] = await Promise.all([
+      // Fetch doctor, clinic, and patient for confirmation email
+      const [doctorData, clinicData, patientData] = await Promise.all([
         tx.doctor.findFirst({ where: { id: doctorId } }),
         tx.clinic.findFirst({ where: { id: clinicId } }),
+        tx.user.findFirst({ where: { id: patientId } }),
       ]);
 
-      return {
+      const result = {
         ...appointment,
         doctor: doctorData ? { name: (doctorData as any).name, avatarUrl: (doctorData as any).avatarUrl } : null,
         clinic: clinicData ? { name: (clinicData as any).name, addressLine1: (clinicData as any).addressLine1 } : null,
       };
+
+      // Send confirmation email (non-blocking)
+      const patientEmail = (patientData as any)?.email as string | undefined;
+      if (patientEmail) {
+        EmailService.sendBookingConfirmationEmail({
+          to: patientEmail,
+          patientName: (patientData as any).name ?? 'Patient',
+          doctorName: (doctorData as any)?.name ?? '',
+          clinicName: (clinicData as any)?.name ?? '',
+          date: slot.date.toISOString().substring(0, 10),
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          bookingId: appointment.id.substring(0, 8).toUpperCase(),
+        }).catch(() => {});
+      }
+
+      return result;
     });
   }
 
@@ -174,7 +193,6 @@ export class AppointmentsService {
   ) {
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      include: { slot: true },
     });
 
     if (!appointment) throw AppError.notFound('Appointment');
@@ -192,6 +210,22 @@ export class AppointmentsService {
     }
     if (role === 'DOCTOR' && appointment.doctorId !== cancelledBy) {
       throw AppError.forbidden();
+    }
+
+    // Doctors must provide a cancellation reason
+    if (role === 'DOCTOR' && (!reason || reason.trim().length < 5)) {
+      throw AppError.badRequest('Doctors must provide a cancellation reason (min 5 characters)');
+    }
+
+    // 5-minute cancellation buffer: patients cannot cancel within 5 min of appointment
+    if (role === 'PATIENT') {
+      const apptDateTime = new Date(appointment.date);
+      const [h, m] = (appointment.startTime).split(':').map(Number);
+      apptDateTime.setHours(h, m, 0, 0);
+      const minutesUntil = (apptDateTime.getTime() - Date.now()) / 60000;
+      if (minutesUntil < 5 && minutesUntil > -120) {
+        throw AppError.badRequest('Appointments cannot be cancelled within 5 minutes of the scheduled time');
+      }
     }
 
     return prisma.$transaction(async (tx) => {
@@ -215,10 +249,29 @@ export class AppointmentsService {
       });
 
       // Free the slot
-      await tx.timeSlot.update({
+      await tx.timeSlot.updateMany({
         where: { id: appointment.slotId },
         data: { status: SlotStatus.AVAILABLE, bookedAt: null },
       });
+
+      // If doctor cancels, send sorry email to patient
+      if (role === 'DOCTOR') {
+        const [patientData, doctorData] = await Promise.all([
+          tx.user.findFirst({ where: { id: appointment.patientId } }),
+          tx.doctor.findFirst({ where: { id: appointment.doctorId } }),
+        ]);
+        const patientEmail = (patientData as any)?.email as string | undefined;
+        if (patientEmail) {
+          EmailService.sendCancellationSorryEmail({
+            to: patientEmail,
+            patientName: (patientData as any)?.name ?? 'Patient',
+            doctorName: (doctorData as any)?.name ?? '',
+            date: appointment.date.toISOString().substring(0, 10),
+            startTime: appointment.startTime,
+            reason: reason ?? 'Unforeseen circumstances',
+          }).catch(() => {});
+        }
+      }
 
       return updated;
     });

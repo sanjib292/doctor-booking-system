@@ -3,6 +3,7 @@ import { prisma } from '../config/database';
 import { AppError } from '../common/errors/AppError';
 import { hashPassword } from '../common/utils/hash';
 import { buildPagination, buildPaginatedResult } from '../common/types/pagination';
+import * as EmailService from '../common/services/email.service';
 
 export class AdminService {
   // ─── Dashboard ──────────────────────────────────────────────────────────
@@ -113,6 +114,13 @@ export class AdminService {
         entityId: doctorId,
       },
     });
+
+    // Send verification result email to doctor
+    EmailService.sendDoctorVerificationEmail(
+      doctor.email,
+      doctor.name,
+      status as 'VERIFIED' | 'REJECTED',
+    ).catch(() => {});
 
     const { passwordHash, ...safe } = doctor;
     return safe;

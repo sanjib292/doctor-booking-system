@@ -25,6 +25,8 @@ const envSchema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
   BREVO_API_KEY: z.string().optional(),
+  MAILJET_API_KEY: z.string().optional(),
+  MAILJET_SECRET_KEY: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),

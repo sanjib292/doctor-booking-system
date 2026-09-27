@@ -3,34 +3,37 @@ import { env } from '../../config/env';
 const logger = { info: console.log, warn: console.warn, error: console.error };
 
 async function send(to: string, subject: string, html: string) {
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey) {
-    logger.info(`[EMAIL] No BREVO_API_KEY set — skipping. To: ${to} | ${subject}`);
+  const apiKey = process.env.MAILJET_API_KEY;
+  const secretKey = process.env.MAILJET_SECRET_KEY;
+  if (!apiKey || !secretKey) {
+    logger.info(`[EMAIL] No MAILJET_API_KEY/SECRET_KEY set — skipping. To: ${to} | ${subject}`);
     return;
   }
 
   const senderEmail = process.env.SMTP_USER ?? 'doctorbook672@gmail.com';
-  const senderName = 'DoctorBook';
+  const credentials = Buffer.from(`${apiKey}:${secretKey}`).toString('base64');
 
   try {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const res = await fetch('https://api.mailjet.com/v3.1/send', {
       method: 'POST',
       headers: {
-        'api-key': apiKey,
+        'Authorization': `Basic ${credentials}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: to }],
-        subject,
-        htmlContent: html,
+        Messages: [{
+          From: { Email: senderEmail, Name: 'DoctorBook' },
+          To: [{ Email: to }],
+          Subject: subject,
+          HTMLPart: html,
+        }],
       }),
     });
     const data = await res.json() as any;
-    if (!res.ok) {
-      logger.error(`[EMAIL] Brevo API error (${res.status}): ${JSON.stringify(data)}`);
+    if (!res.ok || data.Messages?.[0]?.Status !== 'success') {
+      logger.error(`[EMAIL] Mailjet error (${res.status}): ${JSON.stringify(data)}`);
     } else {
-      logger.info(`[EMAIL] Sent to ${to}: ${subject} (messageId=${data.messageId})`);
+      logger.info(`[EMAIL] Sent to ${to}: ${subject}`);
     }
   } catch (err) {
     logger.error(`[EMAIL] Failed to send to ${to}: ${err}`);

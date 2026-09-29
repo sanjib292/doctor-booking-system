@@ -15,24 +15,23 @@ export class AuthService {
   async registerPatient(
     name: string,
     email: string,
-    phone: string,
     password: string,
+    phone?: string,
     gender?: string,
     age?: number,
     fcmToken?: string,
   ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
-    const [byPhone, byEmail] = await Promise.all([
-      prisma.user.findUnique({ where: { phone } }),
-      prisma.user.findUnique({ where: { email } }),
-    ]);
-    if (byPhone) throw AppError.conflict('Phone number is already registered');
+    const checks: Promise<any>[] = [prisma.user.findUnique({ where: { email } })];
+    if (phone) checks.push(prisma.user.findUnique({ where: { phone } }));
+    const [byEmail, byPhone] = await Promise.all(checks);
     if (byEmail) throw AppError.conflict('Email is already registered');
+    if (byPhone) throw AppError.conflict('Phone number is already registered');
 
     const passwordHash = await hashPassword(password);
 
     const user = await prisma.user.create({
       data: {
-        phone,
+        phone: phone ?? `email:${email}`,
         email,
         name,
         passwordHash,
@@ -50,62 +49,35 @@ export class AuthService {
     return { ...tokens, user: safeUser };
   }
 
-  async sendOtp(phone: string): Promise<{ expiresIn: number }> {
-    logger.info(`[sendOtp] START phone=${phone}`);
+  async sendOtp(email: string): Promise<{ expiresIn: number }> {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw AppError.notFound('Email not registered. Please create an account first.');
+    if (user.isBlocked) throw AppError.forbidden('Account is blocked');
 
-    // Only allow OTP for existing registered patients
-    const existingUser = await prisma.user.findUnique({ where: { phone } });
-    logger.info(`[sendOtp] user lookup done. found=${!!existingUser} email=${(existingUser as any)?.email ?? 'NONE'}`);
-    if (!existingUser) throw AppError.notFound('Phone number not registered. Please contact support.');
-    if (existingUser.isBlocked) throw AppError.forbidden('Account is blocked');
-
-    // Invalidate existing OTPs
     await prisma.otpCode.updateMany({
-      where: { phone, isUsed: false },
+      where: { email, isUsed: false },
       data: { isUsed: true },
     });
-    logger.info(`[sendOtp] old OTPs invalidated`);
 
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const emailConfigured = !!(smtpHost && smtpUser && smtpPass);
-    const smsConfigured = !!(process.env.TWILIO_ACCOUNT_SID || process.env.SMS_API_KEY);
-    logger.info(`[sendOtp] SMTP_HOST="${smtpHost}" SMTP_USER="${smtpUser}" SMTP_PASS_LENGTH=${smtpPass?.length ?? 0} emailConfigured=${emailConfigured}`);
-
-    const code = (emailConfigured || smsConfigured) ? generateOtp() : '123456';
+    const mailjetConfigured = !!(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY);
+    const code = mailjetConfigured ? generateOtp() : '123456';
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    await prisma.otpCode.create({
-      data: { phone, code, expiresAt },
-    });
-    logger.info(`[sendOtp] OTP saved. code=${code}`);
+    await prisma.otpCode.create({ data: { email, code, expiresAt } });
 
-    const userEmail = (existingUser as any).email as string | undefined;
-    if (emailConfigured && userEmail) {
-      logger.info(`[sendOtp] firing email to ${userEmail} (non-blocking)`);
-      // Non-blocking — don't let SMTP delay or failure hold up the response
-      EmailService.sendOtpEmail(userEmail, code, (existingUser as any).name)
-        .then(() => logger.info(`[sendOtp] email sent OK to ${userEmail}`))
-        .catch((err: any) => logger.error(`[sendOtp] email FAILED: ${err}`));
-    } else {
-      logger.info(`[sendOtp] skipping email. emailConfigured=${emailConfigured} userEmail=${userEmail}`);
-    }
+    EmailService.sendOtpEmail(email, code, user.name)
+      .catch((err: any) => logger.error(`[sendOtp] email failed: ${err}`));
 
-    logger.info(`[sendOtp] DONE - returning response`);
     return { expiresIn: OTP_EXPIRY_MINUTES * 60 };
   }
 
   async verifyOtpAndLogin(
-    phone: string,
+    email: string,
     code: string,
-    name?: string,
-    gender?: string,
-    age?: number,
     fcmToken?: string,
-  ): Promise<{ accessToken: string; refreshToken: string; user: object; isNewUser: boolean }> {
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     const otp = await prisma.otpCode.findFirst({
-      where: { phone, isUsed: false },
+      where: { email, isUsed: false },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -114,45 +86,26 @@ export class AuthService {
     if (otp.expiresAt < new Date()) throw AppError.badRequest('OTP has expired', 'OTP_EXPIRED');
 
     if (otp.code !== code) {
-      await prisma.otpCode.update({
-        where: { id: otp.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
       throw AppError.badRequest('Invalid OTP', 'OTP_INVALID');
     }
 
     await prisma.otpCode.update({ where: { id: otp.id }, data: { isUsed: true } });
 
-    let isNewUser = false;
-    let user = await prisma.user.findUnique({ where: { phone } });
-
-    if (!user) {
-      isNewUser = true;
-      user = await prisma.user.create({
-        data: {
-          phone,
-          name: name ?? 'New Patient',
-          role: Role.PATIENT,
-          ...(gender ? { gender: gender as any } : {}),
-          ...(age !== undefined && age !== null ? { age } : {}),
-          ...(fcmToken ? { fcmToken } : {}),
-        },
-      });
-    } else if (fcmToken && user.fcmToken !== fcmToken) {
-      user = await prisma.user.update({ where: { id: user.id }, data: { fcmToken } });
-    }
-
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw AppError.notFound('Account not found');
     if (user.isBlocked) throw AppError.forbidden('Account is blocked');
+
+    if (fcmToken && user.fcmToken !== fcmToken) {
+      await prisma.user.update({ where: { id: user.id }, data: { fcmToken } });
+    }
 
     const tokens = generateTokenPair({ id: user.id, role: user.role, phone: user.phone });
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    await prisma.refreshToken.create({
-      data: { token: tokens.refreshToken, userId: user.id, expiresAt },
-    });
+    await prisma.refreshToken.create({ data: { token: tokens.refreshToken, userId: user.id, expiresAt } });
 
     const { passwordHash: _ph, ...safeUser } = user as any;
-    return { ...tokens, user: safeUser, isNewUser };
+    return { ...tokens, user: safeUser };
   }
 
   async loginWithPassword(

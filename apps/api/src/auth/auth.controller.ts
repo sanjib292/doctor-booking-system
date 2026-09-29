@@ -7,20 +7,19 @@ const authService = new AuthService();
 
 export const registerPatient = asyncHandler(async (req: Request, res: Response) => {
   const { name, email, phone, password, gender, age, fcmToken } = req.body;
-  const result = await authService.registerPatient(name, email, phone, password, gender, age, fcmToken);
+  const result = await authService.registerPatient(name, email, password, phone, gender, age, fcmToken);
   sendCreated(res, result, 'Account created successfully.');
 });
 
 export const sendOtp = asyncHandler(async (req: Request, res: Response) => {
-  const result = await authService.sendOtp(req.body.phone);
+  const result = await authService.sendOtp(req.body.email);
   sendSuccess(res, result, 'OTP sent successfully');
 });
 
 export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
-  const { phone, code, name, gender, age, fcmToken } = req.body;
-  const result = await authService.verifyOtpAndLogin(phone, code, name, gender, age, fcmToken);
-  const status = result.isNewUser ? 201 : 200;
-  res.status(status).json({ success: true, data: result });
+  const { email, code, fcmToken } = req.body;
+  const result = await authService.verifyOtpAndLogin(email, code, fcmToken);
+  sendSuccess(res, result, 'Login successful');
 });
 
 export const loginWithPassword = asyncHandler(async (req: Request, res: Response) => {

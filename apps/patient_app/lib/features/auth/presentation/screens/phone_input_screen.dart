@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -80,7 +79,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
   late final TabController _tabController;
 
   // OTP tab
-  final _phoneController = TextEditingController();
+  final _otpEmailController = TextEditingController();
   final _otpFormKey = GlobalKey<FormState>();
   bool _isOtpLoading = false;
   String? _otpError;
@@ -106,7 +105,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _phoneController.dispose();
+    _otpEmailController.dispose();
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -140,20 +139,22 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
       _otpError = null;
     });
     try {
-      final phone = '+91${_phoneController.text.trim()}';
-      await ref.read(authServiceProvider).sendOtp(phone);
-      if (mounted) context.pushNamed('otpVerification', extra: phone);
+      final email = _otpEmailController.text.trim();
+      await ref.read(authServiceProvider).sendOtp(email);
+      if (mounted) context.pushNamed('otpVerification', extra: email);
     } on DioException catch (e) {
       if (mounted) {
         final data = e.response?.data;
-        final msg = (data is Map ? data['message'] as String? : null) ??
+        final msg = (data is Map
+                ? (data['error'] as Map?)?.containsKey('message') == true
+                    ? data['error']['message'] as String?
+                    : data['message'] as String?
+                : null) ??
             'Something went wrong. Please try again.';
         setState(() => _otpError = msg);
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _otpError = 'Something went wrong. Please try again.');
-      }
+      if (mounted) setState(() => _otpError = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isOtpLoading = false);
     }
@@ -174,14 +175,16 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
     } on DioException catch (e) {
       if (mounted) {
         final data = e.response?.data;
-        final msg = (data is Map ? data['message'] as String? : null) ??
+        final msg = (data is Map
+                ? (data['error'] as Map?)?.containsKey('message') == true
+                    ? data['error']['message'] as String?
+                    : data['message'] as String?
+                : null) ??
             'Invalid credentials. Please try again.';
         setState(() => _pwError = msg);
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _pwError = 'Something went wrong. Please try again.');
-      }
+      if (mounted) setState(() => _pwError = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isPwLoading = false);
     }
@@ -215,41 +218,26 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Enter your mobile number',
+            'Enter your email address',
             style: AppTextStyles.bodyMedium.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
           TextFormField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
-            ],
+            controller: _otpEmailController,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
             style: AppTextStyles.bodyLarge,
-            decoration: InputDecoration(
-              hintText: '9876543210',
-              prefixIcon: Container(
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '+91',
-                  style: AppTextStyles.labelLarge.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-              prefixIconConstraints: const BoxConstraints(minWidth: 0),
+            decoration: const InputDecoration(
+              hintText: 'you@example.com',
+              prefixIcon: Icon(Icons.email_outlined),
             ),
             validator: (v) {
-              if (v == null || v.isEmpty) return 'Phone number required';
-              if (v.length != 10) return 'Enter a valid 10-digit number';
+              if (v == null || v.trim().isEmpty) return 'Email is required';
+              if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-z]{2,}$').hasMatch(v.trim())) {
+                return 'Enter a valid email address';
+              }
               return null;
             },
             onFieldSubmitted: (_) => _sendOtp(),
@@ -258,6 +246,13 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
             const SizedBox(height: 10),
             _buildErrorBanner(_otpError!),
           ],
+          const SizedBox(height: 8),
+          Text(
+            'We\'ll send a 6-digit code to this email.',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 24),
           AppButton(
             label: 'Send OTP',
@@ -277,7 +272,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Sign in with phone or email',
+            'Sign in with your email and password',
             style: AppTextStyles.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -286,13 +281,14 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
           TextFormField(
             controller: _identifierController,
             keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
             style: AppTextStyles.bodyLarge,
             decoration: const InputDecoration(
-              hintText: 'Phone number or email',
+              hintText: 'Email or phone number',
               prefixIcon: Icon(Icons.person_outline_rounded),
             ),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Phone or email required';
+              if (v == null || v.trim().isEmpty) return 'Email is required';
               return null;
             },
           ),
@@ -353,7 +349,6 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
                 children: [
                   const SizedBox(height: 48),
 
-                  // Illustration
                   Center(
                     child: Container(
                       width: 160,
@@ -400,7 +395,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
                       unselectedLabelStyle: AppTextStyles.labelMedium,
                       dividerColor: Colors.transparent,
                       tabs: const [
-                        Tab(text: 'OTP Login'),
+                        Tab(text: 'Email OTP'),
                         Tab(text: 'Password'),
                       ],
                     ),
@@ -408,8 +403,10 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen>
 
                   const SizedBox(height: 28),
 
-                  // Tab content (no TabBarView to avoid nesting scroll issues)
-                  if (_tabController.index == 0) _buildOtpTab() else _buildPasswordTab(),
+                  if (_tabController.index == 0)
+                    _buildOtpTab()
+                  else
+                    _buildPasswordTab(),
 
                   const SizedBox(height: 16),
 

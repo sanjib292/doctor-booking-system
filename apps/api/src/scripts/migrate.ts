@@ -407,6 +407,13 @@ async function migrate() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
     `);
 
+    // Email-based OTP: make phone nullable, add email column + index
+    await client.query(`
+      ALTER TABLE otp_codes ALTER COLUMN phone DROP NOT NULL;
+      ALTER TABLE otp_codes ADD COLUMN IF NOT EXISTS email TEXT;
+      CREATE INDEX IF NOT EXISTS idx_otp_codes_email ON otp_codes(email, "isUsed");
+    `);
+
     console.log('[migrate] ✅ Schema and seed complete.');
   } finally {
     client.release();

@@ -43,8 +43,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/otp',
         name: 'otpVerification',
         builder: (_, state) {
-          final phone = state.extra as String? ?? '';
-          return OtpVerificationScreen(phone: phone);
+          final email = state.extra as String? ?? '';
+          return OtpVerificationScreen(email: email);
         },
       ),
       GoRoute(

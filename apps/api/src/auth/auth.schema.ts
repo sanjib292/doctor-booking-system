@@ -1,15 +1,13 @@
 import { z } from 'zod';
 
 export const sendOtpSchema = z.object({
-  phone: z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'),
+  email: z.string().email('Invalid email address'),
+  fcmToken: z.string().optional(),
 });
 
 export const verifyOtpSchema = z.object({
-  phone: z.string().regex(/^\+?[1-9]\d{9,14}$/),
+  email: z.string().email(),
   code: z.string().length(6),
-  name: z.string().min(2).max(100).optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional(),
-  age: z.number().int().min(1).max(120).optional(),
   fcmToken: z.string().optional(),
 });
 
@@ -27,7 +25,7 @@ export const adminLoginSchema = z.object({
 export const registerPatientSchema = z.object({
   name: z.string().min(2).max(100),
   email: z.string().email(),
-  phone: z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'),
+  phone: z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number').optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional(),
   age: z.number().int().min(1).max(120).optional(),
@@ -39,7 +37,7 @@ export const refreshTokenSchema = z.object({
 });
 
 export const patientLoginSchema = z.object({
-  identifier: z.string().min(1, 'Phone or email required'),
+  identifier: z.string().min(1, 'Email or phone required'),
   password: z.string().min(1, 'Password required'),
   fcmToken: z.string().optional(),
 });

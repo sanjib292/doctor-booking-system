@@ -10,47 +10,37 @@ class AuthService {
 
   AuthService(this._dio, this._storage);
 
-  Future<void> sendOtp(String phone) async {
-    await _dio.post('/auth/patient/send-otp', data: {'phone': phone});
+  Future<void> sendOtp(String email) async {
+    await _dio.post('/auth/patient/send-otp', data: {'email': email});
   }
 
-  Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
+  Future<Map<String, dynamic>> verifyOtp(String email, String code) async {
     final response = await _dio.post('/auth/patient/verify-otp', data: {
-      'phone': phone,
+      'email': email,
       'code': code,
     });
-
     final data = response.data['data'] as Map<String, dynamic>;
-
     await _storage.saveTokens(
       accessToken: data['accessToken'] as String,
       refreshToken: data['refreshToken'] as String,
     );
-
-    if (data['isNewUser'] == false) {
-      await _storage.saveUser(data['user'] as Map<String, dynamic>);
-    }
-
+    await _storage.saveUser(data['user'] as Map<String, dynamic>);
     return data;
   }
 
-  // Returns the response data. If the backend returned tokens (new flow),
-  // they are saved and the caller should navigate to home.
-  // If the backend returned only { expiresIn } (old/undeployed backend),
-  // tokens will not be present and the caller should navigate to OTP.
   Future<Map<String, dynamic>> registerPatient({
     required String name,
     required String email,
-    required String phone,
     required String password,
+    String? phone,
     String? gender,
     int? age,
   }) async {
     final response = await _dio.post('/auth/patient/register', data: {
       'name': name,
       'email': email,
-      'phone': phone,
       'password': password,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
       if (gender != null) 'gender': gender,
       if (age != null) 'age': age,
     });
@@ -82,25 +72,9 @@ class AuthService {
     return data;
   }
 
-  Future<void> completeRegistration({
-    required String name,
-    String? gender,
-    int? age,
-  }) async {
-    // The user is already created via verifyOtp; update profile
-    await _dio.patch('/users/me', data: {
-      'name': name,
-      if (gender != null) 'gender': gender,
-      if (age != null) 'age': age,
-    });
-  }
-
   // Phase 2: Google Sign-In
   Future<void> googleSignIn() async {
-    final googleSignIn = GoogleSignIn(
-      scopes: ['email', 'profile'],
-    );
-
+    final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
     final account = await googleSignIn.signIn();
     if (account == null) throw Exception('Google Sign-In cancelled');
 
@@ -108,10 +82,7 @@ class AuthService {
     final idToken = auth.idToken;
     if (idToken == null) throw Exception('Failed to get Google ID token');
 
-    final response = await _dio.post('/auth/patient/google', data: {
-      'idToken': idToken,
-    });
-
+    final response = await _dio.post('/auth/patient/google', data: {'idToken': idToken});
     final data = response.data['data'] as Map<String, dynamic>;
     await _storage.saveTokens(
       accessToken: data['accessToken'] as String,

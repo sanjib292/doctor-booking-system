@@ -9,14 +9,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../providers/auth_provider.dart';
 
 class RegistrationScreen extends ConsumerStatefulWidget {
-  const RegistrationScreen({
-    super.key,
-    this.phone = '',
-    this.token = '',
-  });
-
-  final String phone;
-  final String token;
+  const RegistrationScreen({super.key});
 
   @override
   ConsumerState<RegistrationScreen> createState() => _RegistrationScreenState();
@@ -40,10 +33,6 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.phone.isNotEmpty) {
-      final digits = widget.phone.replaceAll('+91', '');
-      _phoneController.text = digits;
-    }
   }
 
   @override
@@ -65,24 +54,18 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     });
 
     try {
-      final phone = '+91${_phoneController.text.trim()}';
+      final rawPhone = _phoneController.text.trim();
       final data = await ref.read(authServiceProvider).registerPatient(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
-        phone: phone,
         password: _passwordController.text,
+        phone: rawPhone.isNotEmpty ? '+91$rawPhone' : null,
         gender: _gender,
         age: int.tryParse(_ageController.text),
       );
 
-      if (mounted) {
-        // New backend returns tokens → go home directly.
-        // Old backend returns { expiresIn } → fall back to OTP screen.
-        if (data['accessToken'] != null) {
-          context.goNamed('home');
-        } else {
-          context.goNamed('otpVerification', extra: phone);
-        }
+      if (mounted && data['accessToken'] != null) {
+        context.goNamed('home');
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -171,7 +154,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                 const SizedBox(height: 20),
 
                 // Phone
-                Text('Phone Number *', style: AppTextStyles.labelMedium),
+                Text('Phone Number (optional)', style: AppTextStyles.labelMedium),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _phoneController,
@@ -199,7 +182,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                     prefixIconConstraints: const BoxConstraints(minWidth: 0),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Phone number required';
+                    if (v == null || v.isEmpty) return null; // optional
                     if (v.length != 10) return 'Enter a valid 10-digit number';
                     return null;
                   },

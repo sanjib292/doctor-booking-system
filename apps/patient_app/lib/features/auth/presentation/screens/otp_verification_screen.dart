@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,16 +10,17 @@ import '../../../../core/widgets/app_button.dart';
 import '../providers/auth_provider.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
-  const OtpVerificationScreen({super.key, required this.phone});
+  const OtpVerificationScreen({super.key, required this.email});
 
-  final String phone;
+  final String email;
 
   @override
   ConsumerState<OtpVerificationScreen> createState() =>
       _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
+class _OtpVerificationScreenState
+    extends ConsumerState<OtpVerificationScreen> {
   String _otp = '';
   bool _isLoading = false;
   int _resendSeconds = 60;
@@ -57,26 +59,28 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   Future<void> _verifyOtp(String otp) async {
     if (otp.length != 6) return;
     if (!mounted) return;
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
-      final result = await ref
-          .read(authServiceProvider)
-          .verifyOtp(widget.phone, otp);
-
+      await ref.read(authServiceProvider).verifyOtp(widget.email, otp);
       if (!mounted) return;
-
-      if (result['isNewUser'] == true) {
-        context.pushNamed(
-          'registration',
-          extra: {'phone': widget.phone, 'token': result['accessToken']},
-        );
-      } else {
-        context.goNamed('home');
-      }
+      context.goNamed('home');
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final data = e.response?.data;
+      final msg = (data is Map
+              ? (data['error'] as Map?)?.containsKey('message') == true
+                  ? data['error']['message'] as String?
+                  : data['message'] as String?
+              : null) ??
+          'Invalid OTP. Please try again.';
+      setState(() => _error = msg);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -84,8 +88,19 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
   Future<void> _resendOtp() async {
     if (_resendSeconds > 0) return;
-    await ref.read(authServiceProvider).sendOtp(widget.phone);
-    _startResendTimer();
+    try {
+      await ref.read(authServiceProvider).sendOtp(widget.email);
+      _startResendTimer();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to resend OTP. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -106,7 +121,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
             children: [
               const SizedBox(height: 24),
 
-              Text('Verify Phone', style: AppTextStyles.headlineMedium),
+              Text('Verify your email', style: AppTextStyles.headlineMedium),
               const SizedBox(height: 8),
               RichText(
                 text: TextSpan(
@@ -114,15 +129,22 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                   children: [
-                    const TextSpan(text: 'Enter the 6-digit OTP sent to '),
+                    const TextSpan(text: 'Enter the 6-digit code sent to\n'),
                     TextSpan(
-                      text: widget.phone,
+                      text: widget.email,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Check your spam folder if you don\'t see it.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
 
@@ -148,7 +170,10 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 enableActiveFill: true,
                 onChanged: (v) {
                   if (!mounted) return;
-                  setState(() { _otp = v; _error = null; });
+                  setState(() {
+                    _otp = v;
+                    _error = null;
+                  });
                 },
                 onCompleted: (v) {
                   if (!mounted) return;
@@ -160,7 +185,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _error!,
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                  style:
+                      AppTextStyles.bodySmall.copyWith(color: AppColors.error),
                 ),
               ],
 
@@ -177,14 +203,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               Center(
                 child: _resendSeconds > 0
                     ? Text(
-                        'Resend OTP in ${_resendSeconds}s',
+                        'Resend code in ${_resendSeconds}s',
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       )
                     : TextButton(
                         onPressed: _resendOtp,
-                        child: const Text('Resend OTP'),
+                        child: const Text('Resend code'),
                       ),
               ),
             ],

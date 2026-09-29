@@ -500,7 +500,8 @@ model DoctorNotification {
 
 model OtpCode {
   id          String   @id @default(uuid())
-  phone       String
+  phone       String?
+  email       String?
   code        String
   isUsed      Boolean  @default(false)
   expiresAt   DateTime
@@ -508,6 +509,7 @@ model OtpCode {
   createdAt   DateTime @default(now())
 
   @@index([phone, isUsed])
+  @@index([email, isUsed])
   @@index([expiresAt])
   @@map("otp_codes")
 }

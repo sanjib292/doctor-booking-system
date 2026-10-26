@@ -104,6 +104,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [api-test]
+    # Advisory: requires DOCKER_USERNAME/DOCKER_PASSWORD repository secrets.
+    # The API image is built and deployed by Railway, so this publish is optional.
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4

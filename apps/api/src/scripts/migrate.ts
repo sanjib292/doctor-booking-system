@@ -4,13 +4,23 @@
  * Uses IF NOT EXISTS so it's safe to run on every deploy.
  */
 import { Pool } from 'pg';
+import bcrypt from 'bcryptjs';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const SCHEMA_VERSION = '0001_init';
 
 async function migrate() {
   const client = await pool.connect();
   try {
     console.log('[migrate] Starting schema migration...');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version TEXT PRIMARY KEY,
+        applied_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
 
     await client.query(`
       -- Enums
@@ -364,17 +374,23 @@ async function migrate() {
       );
     `);
 
-    // Seed admin if not present
-    const adminCheck = await client.query(`SELECT id FROM admins WHERE email = 'admin@doctorbooking.com'`);
-    if (adminCheck.rowCount === 0) {
-      console.log('[migrate] Seeding initial admin...');
-      // bcrypt hash of "Admin@123456" with cost 12
-      const hash = '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TsDjMqRWqMqALhvS6gj2Iqvhh0VC'; // placeholder
-      await client.query(`
-        INSERT INTO admins (id, email, "passwordHash", name, role, "createdAt", "updatedAt")
-        VALUES (gen_random_uuid()::text, 'admin@doctorbooking.com', $1, 'Super Admin', 'SUPER_ADMIN', NOW(), NOW())
-        ON CONFLICT (email) DO NOTHING
-      `, [hash]);
+    // Seed initial admin from env — never overwrite an existing account
+    const seedAdminEmail = process.env.SEED_ADMIN_EMAIL;
+    const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (seedAdminEmail && seedAdminPassword) {
+      const adminCheck = await client.query(`SELECT id FROM admins WHERE email = $1`, [seedAdminEmail]);
+      if (adminCheck.rowCount === 0) {
+        console.log(`[migrate] Seeding initial admin ${seedAdminEmail}...`);
+        const hash = await bcrypt.hash(seedAdminPassword, 12);
+        await client.query(
+          `INSERT INTO admins (id, email, "passwordHash", name, role, "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, $2, 'Super Admin', 'SUPER_ADMIN', NOW(), NOW())
+           ON CONFLICT (email) DO NOTHING`,
+          [seedAdminEmail, hash],
+        );
+      }
+    } else {
+      console.log('[migrate] SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD not set — skipping admin seed.');
     }
 
     // Seed categories if empty
@@ -414,7 +430,11 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_otp_codes_email ON otp_codes(email, "isUsed");
     `);
 
-    console.log('[migrate] ✅ Schema and seed complete.');
+    const recorded = await client.query(
+      `INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING RETURNING version`,
+      [SCHEMA_VERSION],
+    );
+    console.log(`[migrate] ✅ Schema and seed complete. (schema version ${SCHEMA_VERSION}${recorded.rowCount ? ', newly applied' : ', already applied'})`);
   } finally {
     client.release();
     await pool.end();

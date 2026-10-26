@@ -3,7 +3,6 @@ import { prisma } from '../config/database';
 import { AppError } from '../common/errors/AppError';
 import { env } from '../config/env';
 import { buildPagination, buildPaginatedResult } from '../common/types/pagination';
-import { addMinutes, format, parseISO, isAfter, isBefore, eachMinuteOfInterval } from '../common/utils/dateUtils';
 import * as EmailService from '../common/services/email.service';
 
 export class AppointmentsService {

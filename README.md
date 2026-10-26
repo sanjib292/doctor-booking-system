@@ -612,7 +612,7 @@ docker compose up -d --build
 docker exec doctor-booking-api npx prisma migrate deploy
 
 # Seed (first deploy only)
-docker exec doctor-booking-api node dist/prisma/seed.js
+docker exec doctor-booking-api node dist/scripts/seed.js
 ```
 
 ### Production Flutter Builds

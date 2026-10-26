@@ -60,7 +60,14 @@ export class AuthService {
     });
 
     const mailjetConfigured = !!(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY);
-    const code = mailjetConfigured ? generateOtp() : '123456';
+    if (!mailjetConfigured) {
+      throw new AppError(
+        'Email delivery is not configured. Set MAILJET_API_KEY and MAILJET_SECRET_KEY.',
+        503,
+        'EMAIL_NOT_CONFIGURED',
+      );
+    }
+    const code = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await prisma.otpCode.create({ data: { email, code, expiresAt } });
@@ -295,11 +302,19 @@ export class AuthService {
     return { ...tokens, user: safeUser, isNewUser };
   }
 
-  // ─── Seed / reset known accounts ──────────────────────────────────
-  async initSeed(): Promise<object> {
+  // ─── Seed demo data (CLI only, guarded by ALLOW_SEED) ─────────────
+  async seedDemoData(): Promise<object> {
+    if (process.env.ALLOW_SEED !== 'true') {
+      throw AppError.forbidden('Seeding is disabled. Set ALLOW_SEED=true to enable.');
+    }
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+    const doctorPassword = process.env.SEED_DOCTOR_PASSWORD;
+    if (!adminPassword || !doctorPassword) {
+      throw AppError.badRequest('SEED_ADMIN_PASSWORD and SEED_DOCTOR_PASSWORD must be set');
+    }
     const [adminHash, doctorHash] = await Promise.all([
-      hashPassword('Admin@123456'),
-      hashPassword('Doctor@123456'),
+      hashPassword(adminPassword),
+      hashPassword(doctorPassword),
     ]);
 
     // ── Admin ────────────────────────────────────────────────────────
@@ -455,7 +470,6 @@ export class AuthService {
       doctors: [(doctor1 as any).email, (doctor2 as any).email],
       categories: ['Cardiology', 'Neurology', 'General Physician', 'Dermatology', 'Orthopedics', 'Pediatrics'],
       clinics: [(clinic1 as any).name, (clinic2 as any).name],
-      passwords: { admin: 'Admin@123456', doctors: 'Doctor@123456' },
     };
   }
 }

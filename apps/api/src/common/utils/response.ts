@@ -1,5 +1,27 @@
 import { Response } from 'express';
 
+const SENSITIVE_KEYS = new Set(['passwordHash']);
+
+function isPlainObject(value: object): boolean {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+export function stripSensitive<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripSensitive(item)) as unknown as T;
+  }
+  if (value && typeof value === 'object' && isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      if (SENSITIVE_KEYS.has(key)) continue;
+      out[key] = stripSensitive(val);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
@@ -22,7 +44,7 @@ export function sendSuccess<T>(
   return res.status(statusCode).json({
     success: true,
     message,
-    data,
+    data: stripSensitive(data),
     meta,
   } satisfies ApiResponse<T>);
 }

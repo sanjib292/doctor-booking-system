@@ -1,5 +1,3 @@
-import { env } from '../../config/env';
-
 const logger = { info: console.log, warn: console.warn, error: console.error };
 
 async function send(to: string, subject: string, html: string) {

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../common/errors/AppError';
+import { rawQuery } from '../common/utils/raw';
 import { buildPagination, buildPaginatedResult, PaginationQuery } from '../common/types/pagination';
 
 export interface DoctorSearchFilters extends PaginationQuery {
@@ -53,7 +54,7 @@ export class DoctorsService {
 
     // Fetch clinic associations and category associations in parallel
     const [clinicRows, categoryRows] = await Promise.all([
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT dc.id, dc."doctorId", dc."consultationFee", dc."isPrimary",
                 c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng, c."addressLine1"
          FROM doctor_clinics dc
@@ -61,7 +62,7 @@ export class DoctorsService {
          WHERE dc."doctorId" = ANY($1) AND dc."isActive" = true`,
         doctorIds,
       ),
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT dcat."doctorId", dcat."isPrimary",
                 cat.id as "categoryId", cat.name as "categoryName", cat."iconUrl"
          FROM doctor_categories dcat
@@ -145,7 +146,7 @@ export class DoctorsService {
     if (!doctor) throw AppError.notFound('Doctor');
 
     const [clinicRows, categoryRows, availabilities, reviews] = await Promise.all([
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT dc.*, c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng,
                 c."addressLine1", c."addressLine2", c."postalCode", c.phone as "clinicPhone", c."isActive" as "clinicActive"
          FROM doctor_clinics dc
@@ -153,7 +154,7 @@ export class DoctorsService {
          WHERE dc."doctorId" = $1 AND dc."isActive" = true`,
         doctorId,
       ),
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT dcat."isPrimary", cat.*
          FROM doctor_categories dcat
          JOIN categories cat ON cat.id = dcat."categoryId"
@@ -161,7 +162,7 @@ export class DoctorsService {
         doctorId,
       ),
       prisma.doctorAvailability.findMany({ where: { doctorId, isActive: true } }),
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT r.id, r.rating, r.comment, r."createdAt",
                 u.name as "patientName", u."avatarUrl" as "patientAvatar"
          FROM reviews r
@@ -211,7 +212,7 @@ export class DoctorsService {
     const today = new Date().toISOString().split('T')[0];
 
     const [clinicRows, categoryRows, availabilities, vacations, blockedDates] = await Promise.all([
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT dc.*, c.id as "clinicId", c.name as "clinicName", c.city, c.lat, c.lng,
                 c."addressLine1", c."addressLine2", c."postalCode", c.phone as "clinicPhone"
          FROM doctor_clinics dc
@@ -219,7 +220,7 @@ export class DoctorsService {
          WHERE dc."doctorId" = $1`,
         doctorId,
       ),
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT dcat."isPrimary", cat.*
          FROM doctor_categories dcat
          JOIN categories cat ON cat.id = dcat."categoryId"
@@ -227,11 +228,11 @@ export class DoctorsService {
         doctorId,
       ),
       prisma.doctorAvailability.findMany({ where: { doctorId } }),
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT * FROM doctor_vacations WHERE "doctorId" = $1 AND "endDate" >= $2`,
         doctorId, today,
       ),
-      prisma.$queryRaw(
+      rawQuery(
         `SELECT * FROM blocked_dates WHERE "doctorId" = $1 AND date >= $2`,
         doctorId, today,
       ),
@@ -254,7 +255,7 @@ export class DoctorsService {
 
   async updateDoctorProfile(
     doctorId: string,
-    data: Partial<{ about: string; languages: string[]; avatarUrl: string; fcmToken: string }>,
+    data: Partial<{ about: string; languages: string[]; avatarUrl: string; fcmToken: string; phone: string }>,
   ) {
     const doctor = await prisma.doctor.update({
       where: { id: doctorId },

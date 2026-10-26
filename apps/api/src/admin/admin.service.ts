@@ -2,6 +2,7 @@ import { Prisma, VerificationStatus } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../common/errors/AppError';
 import { hashPassword } from '../common/utils/hash';
+import { rawQuery } from '../common/utils/raw';
 import { buildPagination, buildPaginatedResult } from '../common/types/pagination';
 import * as EmailService from '../common/services/email.service';
 
@@ -234,7 +235,7 @@ export class AdminService {
     if (flatAppts.length === 0) return buildPaginatedResult([], 0, page, limit);
 
     const apptIds = (flatAppts as any[]).map((a: any) => a.id);
-    const apptRows = await prisma.$queryRaw(
+    const apptRows = await rawQuery(
       `SELECT a.id,
               u.id as "patientId", u.name as "patientName", u."avatarUrl" as "patientAvatar",
               d.id as "doctorId", d.name as "doctorName", d."avatarUrl" as "doctorAvatar",
@@ -325,7 +326,7 @@ export class AdminService {
   // ─── Doctor Clinic Assignment ────────────────────────────────────────
 
   async getDoctorClinics(doctorId: string) {
-    const rows = await prisma.$queryRaw(
+    const rows = await rawQuery(
       `SELECT dc.*, c.name as "clinicName", c.city, c."addressLine1"
        FROM doctor_clinics dc
        JOIN clinics c ON c.id = dc."clinicId"
@@ -361,7 +362,7 @@ export class AdminService {
   // ─── Doctor Category Assignment ──────────────────────────────────────
 
   async getDoctorCategories(doctorId: string) {
-    const rows = await prisma.$queryRaw(
+    const rows = await rawQuery(
       `SELECT dc.*, c.name as "categoryName", c.color
        FROM doctor_categories dc
        JOIN categories c ON c.id = dc."categoryId"

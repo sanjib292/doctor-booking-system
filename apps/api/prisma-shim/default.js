@@ -192,6 +192,21 @@ const TABLE_MAP = {
   medicalRecord: 'medical_records', appSetting: 'app_settings',
 };
 
+// ─── Field projection (honours Prisma `select`) ──────────────────────────────
+// Only keys present on the row are eligible, so nested relation selections are
+// skipped rather than turned into invalid columns.
+
+function projectRow(row, select) {
+  if (!row || !select || typeof select !== 'object') return row;
+  const out = {};
+  for (const key of Object.keys(row)) {
+    const spec = select[key];
+    if (spec === undefined || spec === false) continue;
+    out[key] = row[key];
+  }
+  return out;
+}
+
 // ─── Model Accessor Class ────────────────────────────────────────────────────
 
 class ModelAccessor {
@@ -229,7 +244,7 @@ class ModelAccessor {
     if (skipClause) sql += ` ${skipClause}`;
 
     const rows = await this.query(sql, params);
-    return rows;
+    return rows.map((r) => projectRow(r, select));
   }
 
   async create({ data, include, select } = {}) {
@@ -246,10 +261,10 @@ class ModelAccessor {
     if (cols.length === 0) throw new Error('No columns to insert');
     const sql = `INSERT INTO "${this.table}" (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`;
     const rows = await this.query(sql, params);
-    return rows[0];
+    return projectRow(rows[0], select);
   }
 
-  async update({ where, data } = {}) {
+  async update({ where, data, select } = {}) {
     resetParams();
     const params = [];
     // Only auto-update updatedAt for tables that have it (detected by checking if not already set)
@@ -261,7 +276,7 @@ class ModelAccessor {
     if (whereClause) sql += ` WHERE ${whereClause}`;
     sql += ' RETURNING *';
     const rows = await this.query(sql, params);
-    return rows[0];
+    return projectRow(rows[0], select);
   }
 
   async updateMany({ where, data } = {}) {
@@ -298,18 +313,18 @@ class ModelAccessor {
     return { count: result.rowCount };
   }
 
-  async upsert({ where, create, update } = {}) {
+  async upsert({ where, create, update, select } = {}) {
     resetParams();
     const existing = await this.findFirst({ where });
     if (existing) {
-      return this.update({ where, data: update });
+      return this.update({ where, data: update, select });
     } else {
       const merged = { ...create };
       // Apply where conditions as fields
       for (const [k, v] of Object.entries(where)) {
         if (!merged[k]) merged[k] = v;
       }
-      return this.create({ data: merged });
+      return this.create({ data: merged, select });
     }
   }
 

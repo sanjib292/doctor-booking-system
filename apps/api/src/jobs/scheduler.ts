@@ -146,7 +146,6 @@ const cleanOtpJob = new CronJob('0 0 * * *', async () => {
 // Clean up revoked refresh tokens older than 30 days
 const cleanTokensJob = new CronJob('0 2 * * *', async () => {
   try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const { count } = await prisma.refreshToken.deleteMany({
       where: { isRevoked: true, expiresAt: { lt: new Date() } },
     });

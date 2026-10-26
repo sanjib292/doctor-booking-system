@@ -213,14 +213,14 @@ flutter run     # picks the only connected device
 
 ### Patient OTP Login
 
-**OTP is hardcoded to `123456` for all phone numbers during development.**
+Login is **email-based**. `POST /auth/patient/send-otp` requires the email to already be
+registered and needs `MAILJET_API_KEY` + `MAILJET_SECRET_KEY` configured on the server.
+Without them the endpoint returns `503 EMAIL_NOT_CONFIGURED` — there is no hardcoded fallback OTP.
 
-No SMS provider is needed. The full flow works as normal:
-
-1. Enter any valid phone number (e.g. `+919999999999`)
-2. Tap **Send OTP**
-3. Enter `123456` as the OTP
-4. You're logged in (or registered as a new patient on first login)
+1. Register via `POST /auth/patient/register` (email + password), or use password login
+2. `POST /auth/patient/send-otp` with that email — a 6-digit code is emailed
+3. `POST /auth/patient/verify-otp` with the code
+4. You're logged in
 
 ---
 
@@ -253,12 +253,12 @@ curl $BASE/../health
 # Send OTP
 curl -X POST $BASE/auth/patient/send-otp \
   -H "Content-Type: application/json" \
-  -d '{"phone":"+919999999999"}'
+  -d '{"email":"patient@example.com"}'
 
-# Verify OTP (always 123456)
+# Verify OTP
 curl -X POST $BASE/auth/patient/verify-otp \
   -H "Content-Type: application/json" \
-  -d '{"phone":"+919999999999","code":"123456","name":"Test Patient"}'
+  -d '{"email":"patient@example.com","code":"123456"}'
 # → returns { accessToken, refreshToken, user }
 
 # Save the accessToken, then:
@@ -308,13 +308,13 @@ Local dev:   http://localhost:3000/api/v1
 | GET | `/doctors/:id` | Bearer | Doctor profile |
 | GET | `/doctors/:id/slots` | Bearer | Available time slots for a date |
 | GET | `/doctors/:id/availability` | Bearer | Weekly availability schedule (Phase 2) |
-| GET | `/doctors/:id/reviews` | Bearer | Patient reviews |
+| GET | `/reviews/doctor/:doctorId` | — | Patient reviews |
 
 ### Appointments
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/appointments` | Bearer | Book appointment |
-| GET | `/appointments` | Bearer | My appointments |
+| GET | `/appointments/my` | Bearer | My appointments |
 | GET | `/appointments/:id` | Bearer | Appointment detail |
 | PUT | `/appointments/:id/cancel` | Bearer | Cancel appointment |
 | POST | `/appointments/:id/review` | Bearer | Leave a review |
@@ -332,8 +332,7 @@ Local dev:   http://localhost:3000/api/v1
 ### Categories
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/categories` | — | All active categories (10 seeded) |
-| GET | `/categories/:slug` | — | Category by slug |
+| GET | `/admin/categories` | Bearer (admin) | All active categories |
 
 ---
 
@@ -357,7 +356,7 @@ Local dev:   http://localhost:3000/api/v1
 The Android emulator uses `10.0.2.2` to reach `localhost` on your Mac. A real device needs to be on the same WiFi and use your Mac's local IP (e.g. `192.168.x.x:3000`), or use ngrok.
 
 ### OTP not working
-The OTP is always `123456` — make sure you're calling `/auth/patient/send-otp` first (it creates the DB record), then `/auth/patient/verify-otp` with `123456`.
+OTP login is email-based: register the email first, and set `MAILJET_API_KEY`/`MAILJET_SECRET_KEY` on the server. Without a provider the API returns `503 EMAIL_NOT_CONFIGURED`.
 
 ### Flutter pub get fails
 Make sure you're on Flutter 3.22+. Run `flutter upgrade` if needed.

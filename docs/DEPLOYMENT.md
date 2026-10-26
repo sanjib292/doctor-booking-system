@@ -37,7 +37,7 @@ POSTGRES_PASSWORD=your_secure_password docker-compose up -d --build
 docker exec doctor-booking-api npx prisma migrate deploy
 
 # Seed initial data (first deploy only)
-docker exec doctor-booking-api node dist/prisma/seed.js
+docker exec doctor-booking-api node dist/scripts/seed.js
 
 # Check health
 curl http://localhost:3000/health

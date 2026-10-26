@@ -9,7 +9,7 @@ import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 
 import { env } from './config/env';
-import { connectDatabase, disconnectDatabase } from './config/database';
+import { prisma, connectDatabase, disconnectDatabase } from './config/database';
 import { initializeFirebase } from './config/firebase';
 import { initializeCloudinary } from './config/cloudinary';
 import { swaggerSpec } from './config/swagger';
@@ -29,8 +29,10 @@ const app = express();
 const server = http.createServer(app);
 
 // ─── Socket.IO (for real-time slot updates) ──────────────────────────────────
+const socketOrigins = env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+
 export const io = new SocketIOServer(server, {
-  cors: { origin: env.CORS_ORIGINS.split(','), credentials: true },
+  cors: { origin: socketOrigins, credentials: true },
   path: '/socket.io',
 });
 
@@ -52,18 +54,19 @@ app.set("trust proxy", 1);
 // ─── Security ────────────────────────────────────────────────────────────────
 app.use(helmet());
 
-const allowedOrigins = env.CORS_ORIGINS.split(',').map(o => o.trim());
+const allowedOrigins = env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+const isProduction = env.NODE_ENV === 'production';
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
-    // Allow any localhost origin (Flutter web dev server uses a random port)
-    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+    // Allow any localhost origin in development (Flutter web dev server uses a random port)
+    if (!isProduction && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
       return callback(null, true);
     }
     // Allow explicitly listed origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: origin ${origin} not allowed`));
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -87,7 +90,7 @@ const authLimiter = rateLimit({
   message: { success: false, error: { code: 'TOO_MANY_REQUESTS', message: 'Too many auth attempts' } },
 });
 
-app.use(globalLimiter);
+if (env.NODE_ENV !== 'test') app.use(globalLimiter);
 
 // ─── General Middleware ──────────────────────────────────────────────────────
 app.use(compression());
@@ -98,8 +101,14 @@ app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', {
 }));
 
 // ─── Health Check ────────────────────────────────────────────────────────────
-const healthHandler = (_req: any, res: any) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: env.API_VERSION });
+const healthHandler = async (_req: any, res: any) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), version: env.API_VERSION });
+  } catch (err) {
+    logger.error('Health check failed:', err);
+    res.status(503).json({ status: 'degraded', timestamp: new Date().toISOString(), version: env.API_VERSION });
+  }
 };
 app.get('/health', healthHandler);
 app.get('/api/v1/health', healthHandler);
@@ -107,7 +116,7 @@ app.get('/api/v1/health', healthHandler);
 // ─── API Routes ──────────────────────────────────────────────────────────────
 const apiPrefix = `/api/${env.API_VERSION}`;
 
-app.use(`${apiPrefix}/auth`, authLimiter, authRoutes);
+app.use(`${apiPrefix}/auth`, ...(env.NODE_ENV === 'test' ? [] : [authLimiter]), authRoutes);
 app.use(`${apiPrefix}/doctors`, doctorRoutes);
 app.use(`${apiPrefix}/appointments`, appointmentRoutes);
 app.use(`${apiPrefix}/users`, userRoutes);

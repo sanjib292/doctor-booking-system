@@ -50,5 +50,9 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+if (parsed.data.NODE_ENV === 'production' && !(parsed.data.MAILJET_API_KEY && parsed.data.MAILJET_SECRET_KEY)) {
+  console.warn('⚠️  MAILJET_API_KEY/MAILJET_SECRET_KEY not set — OTP email login will return 503.');
+}
+
 export const env = parsed.data;
 export type Env = typeof env;

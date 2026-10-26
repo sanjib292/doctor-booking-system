@@ -78,7 +78,4 @@ router.post('/logout', validate(refreshTokenSchema), controller.logout);
  */
 router.post('/patient/google', controller.googleSignIn);
 
-// One-time seed — locked once an admin account exists
-router.post('/init-seed', controller.initSeed);
-
 export default router;

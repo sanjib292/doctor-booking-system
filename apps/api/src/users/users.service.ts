@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../common/errors/AppError';
-import { MedicalRecordType } from '@prisma/client';
+import { MedicalRecordType, Prisma } from '@prisma/client';
 
 export class UsersService {
   async getProfile(userId: string) {
@@ -28,7 +28,7 @@ export class UsersService {
   ) {
     return prisma.user.update({
       where: { id: userId },
-      data,
+      data: data as Prisma.UserUpdateInput,
       select: {
         id: true, name: true, phone: true, email: true, gender: true, age: true, avatarUrl: true, role: true,
       },

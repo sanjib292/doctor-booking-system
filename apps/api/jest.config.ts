@@ -8,6 +8,9 @@ const config: Config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  // Importing ../index starts the HTTP server and cron jobs, which keeps the
+  // process alive after the suite finishes.
+  forceExit: true,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.test.ts',

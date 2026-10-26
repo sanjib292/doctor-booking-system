@@ -1,4 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { env } from '../../config/env';
 import { Role } from '@prisma/client';
 
@@ -27,6 +28,9 @@ export function signRefreshToken(payload: TokenPayload): string {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'],
     issuer: 'doctor-booking-api',
     audience: 'doctor-booking-client',
+    // Unique per token: two logins in the same second would otherwise produce an
+    // identical JWT and collide on the UNIQUE refresh_tokens.token constraint.
+    jwtid: randomUUID(),
   });
 }
 

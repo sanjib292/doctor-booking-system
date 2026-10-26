@@ -67,6 +67,15 @@ export function errorHandler(
     }
   }
 
+  // The pg shim surfaces raw Postgres errors (e.g. unique violations) directly.
+  if ((err as { code?: string }).code === '23505') {
+    res.status(409).json({
+      success: false,
+      error: { code: 'CONFLICT', message: 'Resource already exists' },
+    });
+    return;
+  }
+
   logger.error('Unhandled error:', err);
   res.status(500).json({
     success: false,
